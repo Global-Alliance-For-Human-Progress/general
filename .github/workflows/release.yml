@@ -19,7 +19,11 @@ jobs:
       - name: Generate version
         id: version
         run: |
-          VERSION="v$(date +%Y.%m.%d.%s)"
+          DATE=$(date +%Y.%m.%d)
+          # Count existing tags for today
+          COUNT=$(git tag -l "v${DATE}.*" | wc -l)
+          INCREMENT=$((COUNT + 1))
+          VERSION="v${DATE}.${INCREMENT}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Create Release
