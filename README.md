@@ -1,2 +1,12 @@
 # general
-General Repo for hosting useful tools
+
+General repo for hosting useful tools and scripts.
+
+## Scripts
+
+Tampermonkey scripts:
+- **chatgpt_button_clicker.js** - Makes Enter send ChatGPT messages, Shift+Enter creates newlines
+- **tiktok_loop_fix.js** - Forces TikTok videos to loop continuously
+- **jira_show_full_work_team_no_scroll.js** - Removes height constraints on Jira Team Workload gadget to show full content without scrolling
+- **claude_usage_weekly_progress.js** - Adds a weekly cycle elapsed progress bar to Claude usage tracker
+- **modmail_turbo_scroll.js** - Auto-scrolls through entire Reddit modmail history to quickly navigate to oldest messages

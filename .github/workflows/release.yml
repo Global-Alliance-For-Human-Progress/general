@@ -1,0 +1,32 @@
+name: Create Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate version
+        id: version
+        run: |
+          VERSION="v$(date +%Y.%m.%d.%s)"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            Release created on ${{ github.event.head_commit.timestamp }}
+
+            Commit: ${{ github.event.head_commit.url }}
+          draft: false
+          prerelease: false
