@@ -32,8 +32,9 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           name: Release ${{ steps.version.outputs.version }}
           body: |
-            Release created on ${{ github.event.head_commit.timestamp }}
+            ${{ github.event.head_commit.message }}
 
-            Commit: ${{ github.event.head_commit.url }}
+            **Commit:** ${{ github.event.head_commit.url }}
+            **Date:** ${{ github.event.head_commit.timestamp }}
           draft: false
           prerelease: false
