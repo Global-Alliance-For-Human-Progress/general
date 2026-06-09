@@ -12,9 +12,8 @@
 
   let stopRequested = false;
   let consecutiveFailures = 0;
-  const MAX_FAILURES = 2; // Fail fast: 2 strikes and you're out
+  const MAX_FAILURES = 2;
 
-  // Minimal UI for status
   const overlay = document.createElement('div');
   overlay.style = `position:fixed;top:10px;right:10px;z-index:9999;background:#222;color:#0f0;padding:8px 12px;border-radius:4px;font-family:monospace;font-size:11px;border:1px solid #444;`;
   document.body.appendChild(overlay);
@@ -22,43 +21,42 @@
   const updateStatus = (msg) => { overlay.innerText = msg; console.log(msg); };
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+  // Robust container finder for the actual scrollable thread list window
   const getContainer = () => {
     return document.getElementById('modmail-conversations') ||
            document.querySelector('.modmail-conversations') ||
-           document.documentElement;
+           document.querySelector('faceplate-batch') ||
+           document.querySelector('[role="main"]') ||
+           window;
   };
 
   async function turboScrollStep() {
     if (stopRequested) return false;
 
     const container = getContainer();
-    const startHeight = container.scrollHeight;
+    const isWindow = container === window;
 
-    // 1. SNAP to bottom immediately
-    container.scrollTop = container.scrollHeight;
+    // Read starting height dynamically based on target type
+    const startHeight = isWindow ? document.documentElement.scrollHeight : container.scrollHeight;
 
-    // 2. Short pause to let the browser trigger the network request
-    // 400ms is usually enough for Reddit to register the scroll event and fire the API call
+    // FORCE scroll execution to the absolute floor
+    if (isWindow) {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+    } else {
+      container.scrollTop = container.scrollHeight;
+    }
+
     await sleep(400);
 
-    // 3. Wait for height to change (Dynamic Wait)
-    // Instead of waiting a fixed time, we poll until height changes OR timeout hits
     let waited = 0;
-    const timeout = 3000; // Max 3 seconds wait per page
-    const pollRate = 100; // Check every 100ms
+    const timeout = 3000;
+    const pollRate = 100;
 
     while (waited < timeout) {
       if (stopRequested) return false;
 
-      // If user scrolls up, abort
-      if (container.scrollTop < container.scrollHeight - 200) {
-        updateStatus('🛑 User intervened');
-        return false;
-      }
+      const currentHeight = isWindow ? document.documentElement.scrollHeight : container.scrollHeight;
 
-      const currentHeight = container.scrollHeight;
-
-      // Did content load? (Allow 20px buffer for rendering quirks)
       if (currentHeight > startHeight + 20) {
         consecutiveFailures = 0;
         updateStatus(`⚡ Loaded (+${currentHeight - startHeight}px)`);
@@ -69,15 +67,18 @@
       waited += pollRate;
     }
 
-    // 4. Timeout reached with no height change
     consecutiveFailures++;
     updateStatus(`⚠️ No load (${consecutiveFailures}/${MAX_FAILURES})`);
 
-    // Quick retry: Scroll again immediately in case it missed the trigger
     if (consecutiveFailures < MAX_FAILURES) {
-        container.scrollTop = container.scrollHeight;
+        if (isWindow) {
+          window.scrollTo(0, document.documentElement.scrollHeight);
+        } else {
+          container.scrollTop = container.scrollHeight;
+        }
         await sleep(1000);
-        if (container.scrollHeight > startHeight + 20) {
+        const retryHeight = isWindow ? document.documentElement.scrollHeight : container.scrollHeight;
+        if (retryHeight > startHeight + 20) {
             consecutiveFailures = 0;
             return true;
         }
@@ -91,16 +92,19 @@
     consecutiveFailures = 0;
     updateStatus('🚀 TURBO MODE STARTED');
 
-    const stopHandler = () => {
-      stopRequested = true;
-      updateStatus('🛑 STOPPED');
-      setTimeout(() => overlay.remove(), 1000);
+    const stopHandler = (e) => {
+      // Isolates the specific header dropdown block from your snippet
+      const targetZone = document.getElementById('conversation-sort-selector')?.closest('.flex.justify-between.items-center');
+
+      if (targetZone && targetZone.contains(e.target)) {
+        stopRequested = true;
+        updateStatus('🛑 STOPPED BY USER CLICK');
+        window.removeEventListener('click', stopHandler, true);
+        setTimeout(() => overlay.remove(), 1000);
+      }
     };
 
-    // Listen for ANY interaction to stop
-    ['mousemove', 'wheel', 'keydown', 'touchstart'].forEach(evt =>
-      window.addEventListener(evt, stopHandler, { once: true, passive: true })
-    );
+    window.addEventListener('click', stopHandler, true);
 
     while (!stopRequested) {
       const loaded = await turboScrollStep();
@@ -108,19 +112,15 @@
       if (!loaded) {
         if (consecutiveFailures >= MAX_FAILURES) {
           updateStatus('🏁 DONE: End of history');
-          // Optional: Remove alert to be even faster, or keep it for confirmation
-          // alert('✅ Reached the bottom!');
+          window.removeEventListener('click', stopHandler, true);
           break;
         }
       }
 
-      // Minimal pause between successful loads to prevent rate limiting
-      // If we just failed, we don't pause (retry logic handles it)
       if (loaded) await sleep(200);
     }
   }
 
-  // Init
   const init = () => {
     const container = getContainer();
     if (!container) {
