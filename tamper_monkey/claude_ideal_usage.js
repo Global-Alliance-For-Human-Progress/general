@@ -11,10 +11,10 @@
 (function() {
     'use strict';
 
-    function getProgress(resetText) {
+    function getProgress(resetText, isWeekly) {
         const now = new Date();
 
-        // Case 1: Short Relative Session Reset (e.g., "Resets in 27 min")
+        // Case 1: Relative Session/Weekly Reset (e.g., "Resets in 27 min", "Resets in 16 hr 4 min")
         if (resetText.toLowerCase().includes('resets in')) {
             let totalRemainingMs = 0;
 
@@ -26,7 +26,10 @@
 
             if (totalRemainingMs === 0) return null;
 
-            const sessionWindowMs = 5 * 3600000; // Standard 5-hour rolling session
+            // Differentiate max window size: Weekly limit reset cycles are usually 7 days (or use remaining time if it exceeds 7 days)
+            // standard session is 5 hours.
+            const sessionWindowMs = isWeekly ? (7 * 24 * 3600000) : (5 * 3600000); 
+            
             let elapsedMs = sessionWindowMs - totalRemainingMs;
             if (elapsedMs < 0) elapsedMs = 0;
 
@@ -41,7 +44,7 @@
         const totalWeekMs = 604800000;
         const [_, dayName, hourStr, minStr, ampm] = match;
         const resetDay = days.findIndex(d => dayName.toLowerCase().startsWith(d.toLowerCase()));
-        
+
         let resetHour = parseInt(hourStr, 10);
         if (ampm.toUpperCase() === "PM" && resetHour < 12) resetHour += 12;
         if (ampm.toUpperCase() === "AM" && resetHour === 12) resetHour = 0;
@@ -65,7 +68,7 @@
 
         rows.forEach((row, index) => {
             const barId = `burn-rate-tracker-${index}`;
-            
+
             // Look for the reset text and the meter element
             const textSpans = Array.from(row.querySelectorAll('span'));
             const resetSpan = textSpans.find(s => s.textContent.includes('Resets'));
@@ -73,11 +76,21 @@
 
             if (!resetSpan || !meter) return;
 
+            // Grab the row's specific title (e.g. "Current session", "All models")
+            const titleSpan = row.querySelector('span.text-body') || row.querySelector('span[id^="_r_"]');
+            const titleText = titleSpan ? titleSpan.textContent.trim() : "Cycle";
+
+            // Determine if this row falls under a "Weekly limits" section
+            // We traverse up to see if it is a sibling or child under the weekly header
+            const isWeekly = titleText.toLowerCase().includes('all models') || 
+                             titleText.toLowerCase().includes('fable') || 
+                             !!row.closest('div')?.textContent.includes('Weekly limits');
+
             // Extract actual usage percentage from the meter element attribute 'aria-valuenow'
             const actualUsageAttr = meter.getAttribute('aria-valuenow');
             const actualUsage = actualUsageAttr ? parseFloat(actualUsageAttr) : 0;
 
-            const idealLimit = getProgress(resetSpan.textContent);
+            const idealLimit = getProgress(resetSpan.textContent, isWeekly);
             if (idealLimit === null) return;
 
             // Determine status color based on relationship between actual usage and ideal limit
@@ -94,16 +107,12 @@
                 container = document.createElement('div');
                 container.id = barId;
                 container.style = "margin-bottom: 8px; width: 100%; padding-left: 10px;";
-                
+
                 const targetWrapper = meter.closest('.flex-1');
                 if (targetWrapper) {
                     targetWrapper.insertBefore(container, targetWrapper.firstChild);
                 }
             }
-
-            // Grab the row's specific title (e.g. "Current session", "All models")
-            const titleSpan = row.querySelector('span.text-body') || row.querySelector('span[id^="_r_"]');
-            const titleText = titleSpan ? titleSpan.textContent.trim() : "Cycle";
 
             container.style.borderLeft = `3px solid ${color}`;
             container.innerHTML = `
