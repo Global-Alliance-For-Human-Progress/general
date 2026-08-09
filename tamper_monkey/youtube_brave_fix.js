@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Brave Stuck Timer Fix
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  Detects YouTube's on-screen timer/scrubber desyncing from real playback (common on Brave) and drives it from the real video time instead of reloading
 // @author       You
 // @match        https://www.youtube.com/*
@@ -108,6 +108,13 @@
     function checkInitialStall(video, now) {
         if (video.currentTime > 0.25) everStartedPlaying = true;
         if (everStartedPlaying) return false;
+
+        // Paused videos (e.g. a stale player left behind on the homepage) aren't
+        // "stuck on load" - only count stall time while playback is actually attempted.
+        if (video.paused) {
+            firstSeenVideoAt = null;
+            return false;
+        }
 
         if (firstSeenVideoAt === null) firstSeenVideoAt = now;
         if (now - firstSeenVideoAt <= INITIAL_STALL_MS) return false;
