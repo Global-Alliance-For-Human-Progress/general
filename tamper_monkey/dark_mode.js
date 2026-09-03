@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Dark Mode
 // @namespace    http://tampermonkey.net/
-// @version      5.0
+// @version      5.1
 // @description  Universal dark mode via CSS filter inversion, with per-site exceptions and a draggable toggle button. Built as a lighter-weight, more predictable replacement for the Dark Reader extension.
 // @author       You
 // @match        *://*/*
@@ -20,6 +20,7 @@
     const STYLE_ID = 'universal-dark-mode-style';
     const BTN_ID = 'universal-dark-mode-toggle-btn';
     const DARK_MARK_ATTR = 'data-udm-restored';
+    const TOGGLE_ATTR = 'data-udm-toggled';
     const REINVERT_FILTER = 'invert(1) hue-rotate(180deg)';
     // Elements matching this kept getting wrongly flagged as "already dark" and
     // counter-inverted back to their (light) native color, standing out against the
@@ -95,19 +96,43 @@
         return rgbs.reduce((brightest, rgb) => (luminanceOf(rgb) > luminanceOf(brightest) ? rgb : brightest), rgbs[0]);
     }
 
+    // Each REINVERT_FILTER toggle flips the effective parity for its whole subtree, and
+    // toggles can nest (a light search box inside an already-counter-inverted dark
+    // header): what matters for a given element is the CUMULATIVE parity inherited from
+    // all its ancestors, not just whether its immediate parent was toggled.
+    function isNativeParity(el) {
+        let native = false;
+        let node = el.parentElement;
+        while (node) {
+            if (node.hasAttribute(TOGGLE_ATTR)) native = !native;
+            node = node.parentElement;
+        }
+        return native;
+    }
+
+    // What parity does this element's OWN true color want to render in? Dark-native
+    // content (and icons/logos, always) wants native colors to show through; light-
+    // native content wants the inverted (dark-mode) colors instead. Null means no
+    // opinion (no readable background), so it should just inherit whatever it's given.
+    function desiredNativeParity(el) {
+        if (hasIconSizedBackgroundImage(el) || isIconSvg(el)) return true;
+        const rgb = getVisibleBackground(el);
+        return rgb ? luminanceOf(rgb) < 85 : null;
+    }
+
     // Elements that were already dark in the page's own design (e.g. a black navbar)
     // would get flipped light by the html-level invert; counter-invert those specific
     // elements so their original colors survive, the same trick used for media below.
+    // Whether a LOCAL toggle is actually needed depends on what parity this element
+    // already inherited from its ancestors, not just on its own color in isolation.
     function processElementForDarkBackground(el) {
         el.setAttribute(DARK_MARK_ATTR, '1');
         if (el.closest(MANUAL_OVERRIDE_SELECTOR)) return;
-        if (hasIconSizedBackgroundImage(el) || isIconSvg(el)) {
+        const target = desiredNativeParity(el);
+        if (target === null) return;
+        if (target !== isNativeParity(el)) {
             el.style.setProperty('filter', REINVERT_FILTER, 'important');
-            return;
-        }
-        const rgb = getVisibleBackground(el);
-        if (rgb && luminanceOf(rgb) < 85) {
-            el.style.setProperty('filter', REINVERT_FILTER, 'important');
+            el.setAttribute(TOGGLE_ATTR, '1');
         }
     }
 
@@ -118,15 +143,25 @@
     }
 
     // Elements scanned at document-start can read a transient/default background (e.g.
-    // before the real stylesheet applies) and get wrongly locked in as "already dark".
-    // Once fonts/CSS have actually settled, recheck anything we counter-inverted and
-    // undo it if its real background turns out to be light after all.
+    // before the real stylesheet applies) and get wrongly judged. Once fonts/CSS have
+    // actually settled, recheck every scanned element (in document order, so a parent's
+    // corrected toggle is already visible when its children are re-evaluated) and
+    // add/remove its local toggle so its effective parity still matches its own color.
     function revalidateReinvertedElements() {
         if (!styleEl) return;
         document.querySelectorAll(`[${DARK_MARK_ATTR}]`).forEach((el) => {
-            if (!el.style.filter || hasIconSizedBackgroundImage(el) || isIconSvg(el)) return;
-            const rgb = getVisibleBackground(el);
-            if (!rgb || luminanceOf(rgb) >= 85) el.style.removeProperty('filter');
+            if (el.closest(MANUAL_OVERRIDE_SELECTOR)) return;
+            const target = desiredNativeParity(el);
+            if (target === null) return;
+            const needsToggle = target !== isNativeParity(el);
+            const hasToggle = el.hasAttribute(TOGGLE_ATTR);
+            if (needsToggle && !hasToggle) {
+                el.style.setProperty('filter', REINVERT_FILTER, 'important');
+                el.setAttribute(TOGGLE_ATTR, '1');
+            } else if (!needsToggle && hasToggle) {
+                el.style.removeProperty('filter');
+                el.removeAttribute(TOGGLE_ATTR);
+            }
         });
     }
 
@@ -168,6 +203,7 @@
         document.querySelectorAll(`[${DARK_MARK_ATTR}]`).forEach((el) => {
             el.style.removeProperty('filter');
             el.removeAttribute(DARK_MARK_ATTR);
+            el.removeAttribute(TOGGLE_ATTR);
         });
     }
 
