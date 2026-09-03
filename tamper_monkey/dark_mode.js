@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Dark Mode
 // @namespace    http://tampermonkey.net/
-// @version      4.0
+// @version      5.0
 // @description  Universal dark mode via CSS filter inversion, with per-site exceptions and a draggable toggle button. Built as a lighter-weight, more predictable replacement for the Dark Reader extension.
 // @author       You
 // @match        *://*/*
@@ -21,6 +21,11 @@
     const BTN_ID = 'universal-dark-mode-toggle-btn';
     const DARK_MARK_ATTR = 'data-udm-restored';
     const REINVERT_FILTER = 'invert(1) hue-rotate(180deg)';
+    // Elements matching this kept getting wrongly flagged as "already dark" and
+    // counter-inverted back to their (light) native color, standing out against the
+    // rest of the dark page. Skip the heuristic for them entirely so they just fall
+    // under the normal page-wide invert like everything else.
+    const MANUAL_OVERRIDE_SELECTOR = '#afb-nav-container';
 
     function getExceptions() { return GM_getValue(EXCEPTION_KEY, []); }
     function saveExceptions(list) { GM_setValue(EXCEPTION_KEY, list); }
@@ -40,12 +45,13 @@
             filter: ${REINVERT_FILTER} brightness(0.92) contrast(0.9) !important;
         }
 
-        /* Cancel the inversion on real media so photos/video/icons keep natural colors */
-        img, video, picture, canvas, svg, iframe, embed, object,
-        [style*="background-image"] {
+        /* Cancel the inversion on real media so photos/video keep natural colors */
+        img, video, picture, canvas, iframe, embed, object {
             filter: ${REINVERT_FILTER} !important;
         }
     `;
+
+    const ICON_MAX_SIZE = 48;
 
     let styleEl = null;
 
@@ -61,12 +67,45 @@
         return 0.299 * r + 0.587 * g + 0.114 * b;
     }
 
+    // An inline background-image (e.g. a magnifying-glass icon) only reads correctly
+    // uninverted if the element IS the icon; a wide control (search bar, banner) that
+    // merely carries one would have its whole box, text and all, yanked back to light.
+    function hasIconSizedBackgroundImage(el) {
+        if (!el.style?.backgroundImage || el.style.backgroundImage === 'none') return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.width <= ICON_MAX_SIZE && rect.height <= ICON_MAX_SIZE;
+    }
+
+    // Real icon svgs (logos, glyphs) never contain text and should keep their natural
+    // brand colors; chart/data svgs draw text meant to sit on a light background, and
+    // that text needs to follow the page-wide invert (dark -> light) to stay legible.
+    function isIconSvg(el) {
+        return el.tagName === 'svg' && !el.querySelector('text, tspan');
+    }
+
+    // An element's own background-color can be dark while a ::before/::after overlay
+    // paints a lighter color on top (a common decorative pattern); reading only the
+    // element's own layer would misjudge what's actually visible. Whichever layer is
+    // opaque and brightest is what the user actually sees, so that one wins.
+    function getVisibleBackground(el) {
+        const layers = [getComputedStyle(el), getComputedStyle(el, '::before'), getComputedStyle(el, '::after')];
+        if (layers.some((style) => style.backgroundImage !== 'none')) return null;
+        const rgbs = layers.map((style) => parseRgb(style.backgroundColor)).filter(Boolean);
+        if (!rgbs.length) return null;
+        return rgbs.reduce((brightest, rgb) => (luminanceOf(rgb) > luminanceOf(brightest) ? rgb : brightest), rgbs[0]);
+    }
+
     // Elements that were already dark in the page's own design (e.g. a black navbar)
     // would get flipped light by the html-level invert; counter-invert those specific
     // elements so their original colors survive, the same trick used for media below.
     function processElementForDarkBackground(el) {
         el.setAttribute(DARK_MARK_ATTR, '1');
-        const rgb = parseRgb(getComputedStyle(el).backgroundColor);
+        if (el.closest(MANUAL_OVERRIDE_SELECTOR)) return;
+        if (hasIconSizedBackgroundImage(el) || isIconSvg(el)) {
+            el.style.setProperty('filter', REINVERT_FILTER, 'important');
+            return;
+        }
+        const rgb = getVisibleBackground(el);
         if (rgb && luminanceOf(rgb) < 85) {
             el.style.setProperty('filter', REINVERT_FILTER, 'important');
         }
@@ -76,6 +115,19 @@
         if (!styleEl || !(root instanceof Element)) return;
         if (!root.hasAttribute(DARK_MARK_ATTR)) processElementForDarkBackground(root);
         root.querySelectorAll(`:not([${DARK_MARK_ATTR}])`).forEach(processElementForDarkBackground);
+    }
+
+    // Elements scanned at document-start can read a transient/default background (e.g.
+    // before the real stylesheet applies) and get wrongly locked in as "already dark".
+    // Once fonts/CSS have actually settled, recheck anything we counter-inverted and
+    // undo it if its real background turns out to be light after all.
+    function revalidateReinvertedElements() {
+        if (!styleEl) return;
+        document.querySelectorAll(`[${DARK_MARK_ATTR}]`).forEach((el) => {
+            if (!el.style.filter || hasIconSizedBackgroundImage(el) || isIconSvg(el)) return;
+            const rgb = getVisibleBackground(el);
+            if (!rgb || luminanceOf(rgb) >= 85) el.style.removeProperty('filter');
+        });
     }
 
     let scanTimer = null;
@@ -235,6 +287,13 @@
         startDarkScanning();
         createToggleButton();
         if (document.head) headObserver.observe(document.head, { childList: true });
+    });
+
+    window.addEventListener('load', () => {
+        revalidateReinvertedElements();
+        // Third-party widgets (ads, embedded nav bars) sometimes finish styling
+        // shortly after the load event; catch those with one more delayed pass.
+        setTimeout(revalidateReinvertedElements, 1500);
     });
 
     GM_registerMenuCommand('Toggle dark mode for this site', () => {
