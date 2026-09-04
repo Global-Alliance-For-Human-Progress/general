@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Dark Mode
 // @namespace    http://tampermonkey.net/
-// @version      2026-09-04.1
+// @version      2026-09-04.2
 // @description  Universal dark mode via CSS filter inversion, with per-site exceptions and a draggable toggle button. Built as a lighter-weight, more predictable replacement for the Dark Reader extension.
 // @author       You
 // @match        *://*/*
@@ -318,13 +318,23 @@
 
     if (!isExcluded()) enableDarkMode();
 
-    document.addEventListener('DOMContentLoaded', () => {
+    // Listening for DOMContentLoaded only works if it hasn't fired yet; if the
+    // document-start injection loses the race against page parsing (slow device,
+    // instant/cached navigation), the event has already passed and this would
+    // silently never run, leaving the toggle button missing for that load.
+    function initAfterDom() {
         moveStyleToHead();
         bailIfAlreadyDark();
         startDarkScanning();
         createToggleButton();
         if (document.head) headObserver.observe(document.head, { childList: true });
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAfterDom);
+    } else {
+        initAfterDom();
+    }
 
     window.addEventListener('load', () => {
         revalidateReinvertedElements();
