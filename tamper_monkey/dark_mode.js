@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Universal Dark Mode
 // @namespace    http://tampermonkey.net/
-// @version      5.1
+// @version      2026-09-04.1
 // @description  Universal dark mode via CSS filter inversion, with per-site exceptions and a draggable toggle button. Built as a lighter-weight, more predictable replacement for the Dark Reader extension.
 // @author       You
 // @match        *://*/*
+// @noframes
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
