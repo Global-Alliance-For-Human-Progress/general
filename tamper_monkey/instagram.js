@@ -1,12 +1,13 @@
 // ==UserScript==
-// @name         Instagram Auto Unmute & Background Play (Active Only)
+// @name         Instagram Auto Unmute, Background Play & Image Downloader
 // @namespace    http://tampermonkey.net/
-// @version      2.9
-// @description  Autoplay on page load, force unmute, allow background play, keep paused until manually unpaused
+// @version      2026.09.08.1
+// @description  Autoplay on page load, force unmute, allow background play, and download current image/reel poster
 // @author       Liam
 // @match        https://www.instagram.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=instagram.com
-// @grant        none
+// @grant        GM_download
+// @grant        GM_xmlhttpRequest
 // @run-at       document-start
 // ==/UserScript==
 
@@ -38,7 +39,6 @@
     // Force unmute at DOM prototype level once initial interaction has occurred
     Object.defineProperty(HTMLMediaElement.prototype, 'muted', {
         set: function (value) {
-            // Only block muting if video is visible and HAS unmuted successfully before
             if (value === true && isElementVisible(this) && this.dataset.unmuteAllowed === 'true') {
                 originalMutedSetter.call(this, false);
                 return;
@@ -58,6 +58,7 @@
     };
 
     function isElementVisible(el) {
+        if (!el) return false;
         const rect = el.getBoundingClientRect();
         const windowHeight = window.innerHeight || document.documentElement.clientHeight;
         const windowWidth = window.innerWidth || document.documentElement.clientWidth;
@@ -85,8 +86,8 @@
     document.addEventListener('pointerdown', (e) => {
         const target = e.target;
 
-        // Ignore clicks on UI elements (comment button, like icon, share, links, text inputs)
-        const isUI = target.closest('button, a, textarea, input, svg, [role="button"]') && !target.closest('video');
+        // Ignore clicks on UI elements (comment button, like icon, share, links, text inputs, download button)
+        const isUI = target.closest('button, a, textarea, input, svg, [role="button"], #tm-ig-dl-btn') && !target.closest('video');
         if (isUI) return;
 
         const videoContainer = target.closest('article, div[role="dialog"], div[role="presentation"]') || target.parentElement;
@@ -95,7 +96,6 @@
         const video = videoContainer.querySelector('video');
         if (!video) return;
 
-        // Toggle userPaused flag explicitly on click
         if (!video.paused) {
             video.dataset.userPaused = 'true';
             video.pause();
@@ -111,11 +111,9 @@
         if (!video) return;
 
         if (isElementVisible(video)) {
-            // Attempt to un-mute
             originalMutedSetter.call(video, false);
             video.volume = 1.0;
 
-            // Click IG UI mute button if present and state is muted
             const container = video.closest('article') || video.closest('div[role="dialog"]') || video.parentElement;
             if (container) {
                 const muteBtn = container.querySelector('button[aria-label="Audio is muted"], [aria-label="Audio is muted"]');
@@ -132,22 +130,15 @@
         const visible = isElementVisible(video);
 
         if (visible) {
-            // DO NOT auto-play if user explicitly paused it
-            if (video.dataset.userPaused === 'true') {
-                return;
-            }
+            if (video.dataset.userPaused === 'true') return;
 
-            // Force play on page load / view entry
             if (video.paused) {
-                // Try playing unmuted first
                 enforceAudio(video);
                 originalPlay.call(video).then(() => {
                     video.dataset.unmuteAllowed = 'true';
                 }).catch(() => {
-                    // Browser blocked unmuted autoplay: start muted first, then unmute on first gesture
                     originalMutedSetter.call(video, true);
                     originalPlay.call(video).then(() => {
-                        // Attempt secondary unmute right after play starts
                         enforceAudio(video);
                     }).catch(() => {});
                 });
@@ -155,13 +146,11 @@
                 enforceAudio(video);
             }
         } else {
-            // Mute and pause non-visible/off-screen videos
             if (!video.paused) {
                 video.pause();
             }
             originalMutedSetter.call(video, true);
 
-            // Reset flags when scrolled completely off-screen
             delete video.dataset.userPaused;
             delete video.dataset.unmuteAllowed;
         }
@@ -180,12 +169,145 @@
         handleVideoState(video);
     }
 
+    /* --- IMAGE DOWNLOADER SECTION --- */
+
+    function getActiveInstagramImageUrl() {
+        // Strategy A: Post image, carousel slide, modal dialog image, or story
+        const images = Array.from(document.querySelectorAll('article img, main img, div[role="dialog"] img, div[role="presentation"] img'));
+        const visibleImgs = images.filter(img => {
+            const src = img.src || '';
+            const isMedia = src.includes('cdninstagram') || src.includes('fbcdn') || src.startsWith('http');
+            return isMedia && isElementVisible(img) && img.offsetWidth > 180 && img.offsetHeight > 180;
+        });
+
+        if (visibleImgs.length > 0) {
+            visibleImgs.sort((a, b) => (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight));
+            return visibleImgs[0].src;
+        }
+
+        // Strategy B: Poster frame on active video / reel
+        const videos = Array.from(document.querySelectorAll('video'));
+        const activeVideo = videos.find(v => isElementVisible(v) && v.poster);
+        if (activeVideo) {
+            return activeVideo.poster;
+        }
+
+        return null;
+    }
+
+    function handleDownload(btn) {
+        const imgUrl = getActiveInstagramImageUrl();
+
+        if (!imgUrl) {
+            btn.innerText = '❌ No Image Found';
+            setTimeout(() => { btn.innerText = '💾 Download Image'; }, 1500);
+            return;
+        }
+
+        btn.innerText = '⏳ Downloading...';
+        const filename = `instagram_${Date.now()}.jpg`;
+
+        if (typeof GM_download === 'function') {
+            GM_download({
+                url: imgUrl,
+                name: filename,
+                onload: () => {
+                    btn.innerText = '✅ Saved!';
+                    setTimeout(() => { btn.innerText = '💾 Download Image'; }, 1500);
+                },
+                onerror: (err) => {
+                    btn.innerText = '❌ Failed';
+                    console.error('GM_download error:', err);
+                    setTimeout(() => { btn.innerText = '💾 Download Image'; }, 1500);
+                }
+            });
+        } else if (typeof GM_xmlhttpRequest === 'function') {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url: imgUrl,
+                responseType: 'blob',
+                onload: (res) => {
+                    const blobUrl = URL.createObjectURL(res.response);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(blobUrl);
+                    btn.innerText = '✅ Saved!';
+                    setTimeout(() => { btn.innerText = '💾 Download Image'; }, 1500);
+                },
+                onerror: () => {
+                    btn.innerText = '❌ Error';
+                    setTimeout(() => { btn.innerText = '💾 Download Image'; }, 1500);
+                }
+            });
+        }
+    }
+
+    function createFloatingButton() {
+        if (document.getElementById('tm-ig-dl-btn')) return;
+
+        const btn = document.createElement('button');
+        btn.id = 'tm-ig-dl-btn';
+        btn.innerText = '💾 Download Image';
+        btn.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 2147483647;
+            background: #e1306c;
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px 18px;
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            display: none;
+            pointer-events: auto;
+            transition: transform 0.1s ease, background 0.2s ease;
+        `;
+
+        const events = ['pointerdown', 'mousedown', 'mouseup', 'touchstart', 'touchend'];
+        events.forEach(evt => {
+            btn.addEventListener(evt, (e) => {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            }, true);
+        });
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            handleDownload(btn);
+        }, true);
+
+        btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.05)'; });
+        btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
+
+        document.body.appendChild(btn);
+    }
+
+    function updateButtonVisibility() {
+        const btn = document.getElementById('tm-ig-dl-btn');
+        if (!btn) return;
+
+        const imgUrl = getActiveInstagramImageUrl();
+        btn.style.display = imgUrl ? 'block' : 'none';
+    }
+
     function scanAndManage() {
         const videos = document.querySelectorAll('video');
         videos.forEach(video => {
             attachVideoListeners(video);
             handleVideoState(video);
         });
+
+        createFloatingButton();
+        updateButtonVisibility();
     }
 
     window.addEventListener('scroll', scanAndManage, { passive: true });
@@ -200,7 +322,5 @@
         scanAndManage();
     });
 
-    // Fallback timer to force play immediately on dynamic page load
-    setTimeout(scanAndManage, 300);
-    setTimeout(scanAndManage, 1000);
+    setInterval(scanAndManage, 500);
 })();
