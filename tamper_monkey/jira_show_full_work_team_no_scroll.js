@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jira Team Workload Height Fixer
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      2026.05.21
 // @description  Forces height to auto on Team Workload gadget
 // @author       Gemini
 // @match        *://*.atlassian.net/*

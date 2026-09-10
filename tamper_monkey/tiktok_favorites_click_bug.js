@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok Disable Photo Carousel Autoplay + Image Downloader
 // @namespace    tiktok-no-autoplay
-// @version      19.1
+// @version      2026.09.02
 // @description  Disables TikTok photo auto-scrolling and provides a reliable GM_download button for slide images
 // @match        https://www.tiktok.com/*
 // @grant        GM_download

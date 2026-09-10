@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Brave Stuck Timer Fix
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2026.08.09
 // @description  Detects YouTube's on-screen timer/scrubber desyncing from real playback (common on Brave) and drives it from the real video time instead of reloading
 // @author       You
 // @match        https://www.youtube.com/*

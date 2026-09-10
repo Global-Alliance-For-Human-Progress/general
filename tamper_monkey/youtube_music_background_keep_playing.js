@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Music Background Playback Fixer
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      2026.09.02
 // @description  Prevents YouTube Music from pausing or failing to auto-advance in background tabs
 // @author       You
 // @match        https://music.youtube.com/*

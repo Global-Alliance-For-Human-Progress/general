@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Dark Mode
 // @namespace    http://tampermonkey.net/
-// @version      2026-09-05.12
+// @version      2026.09.05.12
 // @description  Dynamic-theme dark mode: rewrites each element's actual background/text/border colors (HSL lightness remap, like Dark Reader's Dynamic Theme) instead of a blanket CSS filter, with per-site exceptions and a draggable toggle button.
 // @author       You
 // @match        *://*/*

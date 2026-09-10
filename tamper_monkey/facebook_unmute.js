@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Auto Unmute & Background Play (Active Only)
 // @namespace    http://tampermonkey.net/
-// @version      2.9
+// @version      2026.09.05
 // @description  Autoplay on page load, force unmute, allow background play, keep paused until manually unpaused on Facebook
 // @author       Liam
 // @match        https://www.facebook.com/*

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Enter to Send, Shift+Enter for Newline
 // @namespace    https://chatgpt.com/
-// @version      3.0
+// @version      2026.05.21
 // @description  Enter sends, Shift+Enter inserts newline
 // @match        https://chat.openai.com/*
 // @match        https://chatgpt.com/*

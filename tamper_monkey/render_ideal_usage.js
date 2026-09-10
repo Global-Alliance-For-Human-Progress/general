@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Render Billing Usage Tracker - Dynamic Colors
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      2026.08.27
 // @description  Adds a dynamic target burn-rate progress bar matching Render's header/metrics layout
 // @author       You
 // @match        https://dashboard.render.com/w/*/billing

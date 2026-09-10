@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Usage Tracker - Dynamic Colors
 // @namespace    http://tampermonkey.net/
-// @version      2026-07-09
+// @version      2026.07.13
 // @description  Adds a color-coded ideal usage limit progress bar to Claude usage meters.
 // @author       You
 // @match        https://claude.ai/*
