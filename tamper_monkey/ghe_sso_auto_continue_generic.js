@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GHE SSO Auto-Continue
 // @namespace    https://example-ghe-instance.example.com/
-// @version      2026.09.11
+// @version      2026.09.12
 // @description  Auto-clicks the "Continue" button on a GitHub Enterprise single sign-on panel
 // @match        https://example-ghe-instance.example.com/*
 // @grant        none
@@ -17,11 +17,14 @@
     const panel = document.querySelector('.business-sso-panel');
     if (!panel) return null;
 
+    const panelText = panel.textContent.trim().toLowerCase();
+    if (!panelText.includes('single sign-on')) return null;
+
     const button = panel.querySelector('form button[type="submit"]');
     if (!button) return null;
 
     const label = button.textContent.trim().toLowerCase();
-    return label.includes('continue') ? button : null;
+    return label === 'continue' ? button : null;
   }
 
   function clickIfPresent() {
