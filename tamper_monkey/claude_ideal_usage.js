@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Usage Tracker - Dynamic Colors
 // @namespace    http://tampermonkey.net/
-// @version      2026.09.17.1
+// @version      2026.09.17.2
 // @description  Adds a color-coded ideal usage limit progress bar to Claude usage meters.
 // @author       You
 // @match        https://claude.ai/*
@@ -224,15 +224,26 @@
             Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
         };
 
+        // TanStack Query's focusManager registers its 'visibilitychange' listener on `window`, not
+        // `document`. A real visibilitychange event bubbles (document -> window), but a synthetic
+        // `new Event('visibilitychange')` defaults to bubbles:false, so dispatching it on `document`
+        // never reaches window's listener and no refetch happens. Dispatch on `window` directly (and
+        // mark bubbles:true) so the listener actually fires each cycle.
+        const fireVisibilityChange = () => {
+            const ev = new Event('visibilitychange', { bubbles: true });
+            document.dispatchEvent(ev);
+            window.dispatchEvent(new Event('visibilitychange', { bubbles: true }));
+        };
+
         try {
             // Phase 1: pretend the tab went hidden (drops the libraries' focused flag to false).
             define('hidden', true);
-            document.dispatchEvent(new Event('visibilitychange'));
+            fireVisibilityChange();
             window.dispatchEvent(new Event('blur'));
 
             // Phase 2: pretend it became visible again -> the false->true edge the libraries refetch on.
             define('visible', false);
-            document.dispatchEvent(new Event('visibilitychange'));
+            fireVisibilityChange();
             window.dispatchEvent(new Event('focus'));
         } finally {
             // Restore the genuine native getters so nothing is left shadowed.
