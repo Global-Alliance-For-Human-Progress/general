@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Usage Tracker - Dynamic Colors
 // @namespace    http://tampermonkey.net/
-// @version      2026.09.11
+// @version      2026.09.17
 // @description  Adds a color-coded ideal usage limit progress bar to Claude usage meters.
 // @author       You
 // @match        https://claude.ai/*
@@ -185,5 +185,21 @@
         });
     }
 
+    // Claude's usage page fetches its meter values once and doesn't re-poll, so the actual
+    // usage % lags behind reality until a manual refresh. Data-fetching libraries (React Query /
+    // SWR, used by the app) refetch stale queries when the window regains focus. We synthesize
+    // that "focus" signal on an interval so Claude re-pulls fresh usage numbers on its own and
+    // repaints its real meters; injectBars() (running every second) then reflects the new values.
+    function triggerUsageRefetch() {
+        // Only nudge when the tab is actually visible, to avoid pointless background fetches.
+        if (document.visibilityState !== 'visible') return;
+
+        // React Query's focusManager keys off document 'visibilitychange'; SWR keys off window 'focus'.
+        // Firing both covers whichever the app uses.
+        document.dispatchEvent(new Event('visibilitychange'));
+        window.dispatchEvent(new Event('focus'));
+    }
+
     setInterval(injectBars, 1000);
+    setInterval(triggerUsageRefetch, 15000); // re-pull real usage numbers every 15s
 })();
