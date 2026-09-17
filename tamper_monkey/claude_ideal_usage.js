@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Usage Tracker - Dynamic Colors
 // @namespace    http://tampermonkey.net/
-// @version      2026.09.17
+// @version      2026.09.17.1
 // @description  Adds a color-coded ideal usage limit progress bar to Claude usage meters.
 // @author       You
 // @match        https://claude.ai/*
@@ -11,7 +11,11 @@
 (function() {
     'use strict';
 
-    function getProgress(resetText, isWeekly) {
+    // Absolute reset timestamps, anchored per row, so relative "Resets in N min" rows can advance
+    // against the live clock instead of only moving when Claude re-renders that coarse text.
+    const idealAnchors = new Map();
+
+    function getProgress(resetText, isWeekly, anchorKey) {
         const now = new Date();
 
         // Case 1: Relative Session/Weekly Reset (e.g., "Resets in 27 min", "Resets in 16 hr 4 min")
@@ -28,9 +32,23 @@
 
             // Differentiate max window size: Weekly limit reset cycles are usually 7 days (or use remaining time if it exceeds 7 days)
             // standard session is 5 hours.
-            const sessionWindowMs = isWeekly ? (7 * 24 * 3600000) : (5 * 3600000); 
-            
-            let elapsedMs = sessionWindowMs - totalRemainingMs;
+            const sessionWindowMs = isWeekly ? (7 * 24 * 3600000) : (5 * 3600000);
+
+            // Anchor an absolute reset moment (now + remaining) and drive progress off the live clock.
+            // Re-anchor only when we have none or the DOM text jumped (window actually reset / big change),
+            // so the countdown text ticking down by a minute doesn't reset our smooth interpolation.
+            const nowMs = now.getTime();
+            const candidateResetTs = nowMs + totalRemainingMs;
+            let resetTs = idealAnchors.get(anchorKey);
+            if (resetTs == null || Math.abs(candidateResetTs - resetTs) > 90000) {
+                resetTs = candidateResetTs;
+                idealAnchors.set(anchorKey, resetTs);
+            }
+
+            let remainingMs = resetTs - nowMs;
+            if (remainingMs < 0) remainingMs = 0;
+
+            let elapsedMs = sessionWindowMs - remainingMs;
             if (elapsedMs < 0) elapsedMs = 0;
 
             return (elapsedMs / sessionWindowMs) * 100;
@@ -148,7 +166,8 @@
             const actualUsageAttr = meter.getAttribute('aria-valuenow');
             const actualUsage = actualUsageAttr ? parseFloat(actualUsageAttr) : 0;
 
-            const idealLimit = getProgress(resetSpan.textContent, isWeekly);
+            // Key the reset-timestamp anchor by row label so it survives Claude re-rendering the meter DOM.
+            const idealLimit = getProgress(resetSpan.textContent, isWeekly, `${titleText}|${isWeekly}`);
             if (idealLimit === null) return;
 
             // Determine status color based on relationship between actual usage and ideal limit
@@ -194,10 +213,32 @@
         // Only nudge when the tab is actually visible, to avoid pointless background fetches.
         if (document.visibilityState !== 'visible') return;
 
-        // React Query's focusManager keys off document 'visibilitychange'; SWR keys off window 'focus'.
-        // Firing both covers whichever the app uses.
-        document.dispatchEvent(new Event('visibilitychange'));
-        window.dispatchEvent(new Event('focus'));
+        // React Query / SWR only refetch on the not-focused -> focused EDGE, not on every focus
+        // event. Firing 'visibilitychange'/'focus' while the tab is already visible is a no-op after
+        // the first time (state never actually transitions), which is why usage updates once and then
+        // stops until a manual refresh. So we fake a full hidden -> visible round-trip each cycle to
+        // recreate that edge every time. The property overrides are own-props on `document` that shadow
+        // the native getters, then deleted in `finally` to restore the real ones immediately.
+        const define = (state, hidden) => {
+            Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state });
+            Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+        };
+
+        try {
+            // Phase 1: pretend the tab went hidden (drops the libraries' focused flag to false).
+            define('hidden', true);
+            document.dispatchEvent(new Event('visibilitychange'));
+            window.dispatchEvent(new Event('blur'));
+
+            // Phase 2: pretend it became visible again -> the false->true edge the libraries refetch on.
+            define('visible', false);
+            document.dispatchEvent(new Event('visibilitychange'));
+            window.dispatchEvent(new Event('focus'));
+        } finally {
+            // Restore the genuine native getters so nothing is left shadowed.
+            delete document.visibilityState;
+            delete document.hidden;
+        }
     }
 
     setInterval(injectBars, 1000);
