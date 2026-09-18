@@ -315,7 +315,8 @@ class LPICS_CalDAV_Client {
 		}
 		$uid = self::new_uid( $event );
 		$url = untrailingslashit( $calendar ) . '/' . $uid . '.ics';
-		$ics = self::build_ics( $uid, $event );
+		// New event => attach the "new booking" alarm if the owner enabled it.
+		$ics = self::build_ics( $uid, $event, LPICS_Options::notify_on_create_enabled() );
 
 		$res = self::request( 'PUT', $url, array(
 			'Content-Type' => 'text/calendar; charset=utf-8',
@@ -331,6 +332,61 @@ class LPICS_CalDAV_Client {
 		}
 		self::log( 'insert_event unexpected HTTP ' . $res['code'] . ' for ' . $url );
 		return '';
+	}
+
+	/**
+	 * Diagnostic: write a real test event into the target calendar using the exact
+	 * same path as a booking sync, and report a human-readable result. Leaves the
+	 * event in place so the admin can confirm it shows up in Apple Calendar, then
+	 * delete it. Returns [ 'ok' => bool, 'error' => string, 'when' => string, 'href' => string ].
+	 */
+	public static function probe_write() {
+		$calendar = LPICS_Options::calendar_url();
+		if ( ! $calendar ) {
+			return array( 'ok' => false, 'error' => 'No target calendar is selected.' );
+		}
+
+		$tz    = function_exists( 'wp_timezone' ) ? wp_timezone() : new DateTimeZone( 'UTC' );
+		$start = new DateTime( 'now', $tz );
+		$start->setTime( (int) $start->format( 'H' ), 0, 0 );
+		$start->modify( '+1 hour' );
+		$end = ( clone $start )->modify( '+30 minutes' );
+
+		$event = array(
+			'summary'     => 'LatePoint iCloud Sync - test event',
+			'description' => 'Created by the "Send test event" button on the plugin settings page. Safe to delete.',
+			'start'       => $start,
+			'end'         => $end,
+			'booking_id'  => 0,
+		);
+
+		$uid = self::new_uid( $event );
+		$url = untrailingslashit( $calendar ) . '/' . $uid . '.ics';
+		// Mirror a real new booking: include the creation alarm when enabled, so
+		// this button also verifies the "new booking" notification works.
+		$ics = self::build_ics( $uid, $event, LPICS_Options::notify_on_create_enabled() );
+
+		$res = self::request( 'PUT', $url, array(
+			'Content-Type'  => 'text/calendar; charset=utf-8',
+			'If-None-Match' => '*',
+		), $ics );
+
+		if ( is_wp_error( $res ) ) {
+			return array( 'ok' => false, 'error' => $res->get_error_message() );
+		}
+		if ( $res['code'] >= 200 && $res['code'] < 300 ) {
+			return array(
+				'ok'   => true,
+				'href' => $url,
+				'when' => $start->format( 'D, M j Y, H:i' ) . ' (' . $tz->getName() . ')',
+			);
+		}
+		$body = trim( wp_strip_all_tags( (string) $res['body'] ) );
+		return array(
+			'ok'    => false,
+			'error' => 'iCloud returned HTTP ' . $res['code'] . ' when writing the event.'
+				. ( '' !== $body ? ' Response: ' . substr( $body, 0, 300 ) : '' ),
+		);
 	}
 
 	/** Update an event at its stored href. Returns true on success, false if gone. */
@@ -471,8 +527,14 @@ class LPICS_CalDAV_Client {
 	/**
 	 * Build a VCALENDAR/VEVENT in UTC. Emitting UTC (Z) times avoids shipping a
 	 * VTIMEZONE component while staying unambiguous on all Apple devices.
+	 *
+	 * When $include_creation_alarm is true, a VALARM with an absolute trigger a
+	 * short time from now is attached, so the account owner's Apple devices ping
+	 * shortly after the event lands (a "new booking came in" alert). This is only
+	 * meant for freshly-created events, not updates, so we don't re-ping on every
+	 * status change.
 	 */
-	private static function build_ics( $uid, array $event ) {
+	private static function build_ics( $uid, array $event, $include_creation_alarm = false ) {
 		$utc = new DateTimeZone( 'UTC' );
 
 		$start = clone $event['start'];
@@ -500,6 +562,24 @@ class LPICS_CalDAV_Client {
 			$lines[] = 'DESCRIPTION:' . $description;
 		}
 		$lines[] = 'X-LPICS-BOOKING-ID:' . $booking_id;
+
+		if ( $include_creation_alarm ) {
+			// Absolute trigger a short way into the future (default 2 min), timed
+			// from when the ICS is actually built/sent, so it is still in the
+			// future when the device receives it and therefore reliably fires.
+			$offset = (int) apply_filters( 'lpics_creation_alarm_offset_seconds', 2 * MINUTE_IN_SECONDS );
+			if ( $offset < 0 ) {
+				$offset = 0;
+			}
+			$trigger    = gmdate( 'Ymd\THis\Z', time() + $offset );
+			$alarm_text = '' !== $summary ? $summary : 'New booking'; // $summary is already ICS-escaped above
+			$lines[]    = 'BEGIN:VALARM';
+			$lines[]    = 'ACTION:DISPLAY';
+			$lines[]    = 'DESCRIPTION:' . $alarm_text;
+			$lines[]    = 'TRIGGER;VALUE=DATE-TIME:' . $trigger;
+			$lines[]    = 'END:VALARM';
+		}
+
 		$lines[] = 'END:VEVENT';
 		$lines[] = 'END:VCALENDAR';
 

@@ -20,6 +20,7 @@ $options = array(
 	'lpics_agent_id',
 	'lpics_sync_out',
 	'lpics_block_busy',
+	'lpics_notify_on_create',
 	'lpics_last_auth_error',
 );
 foreach ( $options as $option ) {

@@ -18,11 +18,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class LPICS_Sync {
 
+	/** WP-Cron hook that performs the actual iCloud write, off the booking request. */
+	const CRON_HOOK = 'lpics_process_booking_sync';
+
 	/** Per-request cache of busy lookups, keyed by "from|to". */
 	private $busy_request_cache = array();
 
 	public function __construct() {
 		// --- Direction OUT ---
+		// The booking hooks below only *schedule* the sync; the network call to
+		// iCloud happens later on self::CRON_HOOK, so a slow or failing CalDAV
+		// request can never block (or break) LatePoint's booking-save request.
 		if ( LPICS_Options::sync_out_enabled() ) {
 			add_action( 'latepoint_booking_created', array( $this, 'on_booking_created' ), 20, 1 );
 			add_action( 'latepoint_booking_updated', array( $this, 'on_booking_updated' ), 20, 2 );
@@ -30,9 +36,81 @@ class LPICS_Sync {
 			add_action( 'latepoint_booking_will_be_deleted', array( $this, 'on_booking_will_be_deleted' ), 20, 1 );
 		}
 
+		// Background worker. Registered unconditionally so any already-queued
+		// event still resolves even if sync-out was toggled off in the meantime.
+		add_action( self::CRON_HOOK, array( $this, 'process_scheduled_sync' ), 10, 3 );
+
 		// --- Direction IN ---
 		if ( LPICS_Options::block_busy_enabled() ) {
 			add_filter( 'latepoint_get_booked_periods', array( $this, 'inject_icloud_busy_periods' ), 20, 2 );
+		}
+	}
+
+	/* =====================================================================
+	 * Scheduling: keep the network call off the booking request
+	 * =================================================================== */
+
+	/**
+	 * Queue a background sync. Every booking hook funnels through here so the
+	 * LatePoint request returns immediately. Wrapped so nothing that happens in
+	 * a booking hook can ever bubble an exception back into LatePoint.
+	 */
+	private function schedule( $op, $booking_id, $href = '' ) {
+		try {
+			$booking_id = (int) $booking_id;
+			if ( ! $booking_id ) {
+				return;
+			}
+			$args = array( $op, $booking_id, (string) $href );
+			if ( ! wp_next_scheduled( self::CRON_HOOK, $args ) ) {
+				wp_schedule_single_event( time(), self::CRON_HOOK, $args );
+			}
+			// Nudge WP-Cron so it runs within moments, via a non-blocking loopback
+			// request (returns instantly, does not delay this response).
+			if ( function_exists( 'spawn_cron' ) ) {
+				spawn_cron();
+			}
+			LPICS_CalDAV_Client::log( 'scheduled ' . $op . ' for booking #' . $booking_id . '.' );
+		} catch ( \Throwable $e ) {
+			LPICS_CalDAV_Client::log( 'schedule(' . $op . ') error: ' . $e->getMessage() );
+		}
+	}
+
+	/**
+	 * WP-Cron worker: run the real iCloud write now that we are off the booking
+	 * request. Never throws; a failure just gets logged.
+	 */
+	public function process_scheduled_sync( $op, $booking_id, $href = '' ) {
+		try {
+			if ( 'delete' === $op ) {
+				if ( $href ) {
+					LPICS_CalDAV_Client::delete_event( $href );
+				}
+				return;
+			}
+			$booking = $this->load_booking( (int) $booking_id );
+			if ( ! $booking ) {
+				LPICS_CalDAV_Client::log( 'scheduled upsert: booking #' . (int) $booking_id . ' no longer loadable.' );
+				return;
+			}
+			$this->upsert_event_for_booking( $booking );
+		} catch ( \Throwable $e ) {
+			LPICS_CalDAV_Client::log( 'process_scheduled_sync error: ' . $e->getMessage() );
+		}
+	}
+
+	/** Read our stored event href off a booking, tolerating LatePoint API differences. */
+	private function get_booking_href( $booking ) {
+		if ( is_object( $booking ) && method_exists( $booking, 'get_meta_by_key' ) ) {
+			return (string) $booking->get_meta_by_key( LPICS_EVENT_META_KEY, '' );
+		}
+		return '';
+	}
+
+	/** Store (or clear) our event href on a booking, tolerating LatePoint API differences. */
+	private function set_booking_href( $booking, $href ) {
+		if ( is_object( $booking ) && method_exists( $booking, 'save_meta_by_key' ) ) {
+			$booking->save_meta_by_key( LPICS_EVENT_META_KEY, $href );
 		}
 	}
 
@@ -105,22 +183,31 @@ class LPICS_Sync {
 	 * =================================================================== */
 
 	public function on_booking_created( $booking ) {
-		$this->upsert_event_for_booking( $booking );
+		if ( is_object( $booking ) && ! empty( $booking->id ) ) {
+			$this->schedule( 'upsert', (int) $booking->id );
+		}
 	}
 
 	public function on_booking_updated( $booking, $old_booking = null ) {
-		$this->upsert_event_for_booking( $booking );
+		if ( is_object( $booking ) && ! empty( $booking->id ) ) {
+			$this->schedule( 'upsert', (int) $booking->id );
+		}
 	}
 
 	public function on_booking_will_be_deleted( $booking_id ) {
-		$booking = $this->load_booking( (int) $booking_id );
-		if ( ! $booking ) {
-			return;
-		}
-		$href = $booking->get_meta_by_key( LPICS_EVENT_META_KEY, '' );
-		if ( $href ) {
-			LPICS_CalDAV_Client::delete_event( $href );
-			$booking->save_meta_by_key( LPICS_EVENT_META_KEY, '' );
+		// The href must be read now, before the booking (and its meta) is gone.
+		try {
+			$booking = $this->load_booking( (int) $booking_id );
+			if ( ! $booking ) {
+				return;
+			}
+			$href = $this->get_booking_href( $booking );
+			if ( $href ) {
+				$this->set_booking_href( $booking, '' );
+				$this->schedule( 'delete', (int) $booking_id, $href );
+			}
+		} catch ( \Throwable $e ) {
+			LPICS_CalDAV_Client::log( 'on_booking_will_be_deleted error: ' . $e->getMessage() );
 		}
 	}
 
@@ -138,20 +225,32 @@ class LPICS_Sync {
 	 * Never throws, a CalDAV failure just leaves the mapping as-is.
 	 */
 	private function upsert_event_for_booking( $booking ) {
-		if ( ! LPICS_Options::is_connected() || empty( $booking ) || empty( $booking->id ) ) {
+		if ( ! LPICS_Options::is_connected() ) {
+			LPICS_CalDAV_Client::log( 'upsert skipped: not connected (need Apple ID + password + target calendar).' );
 			return;
 		}
+		if ( empty( $booking ) || empty( $booking->id ) ) {
+			LPICS_CalDAV_Client::log( 'upsert skipped: booking object was empty or had no id.' );
+			return;
+		}
+		LPICS_CalDAV_Client::log( 'upsert fired for booking #' . $booking->id
+			. ' (agent_id=' . ( isset( $booking->agent_id ) ? $booking->agent_id : 'n/a' )
+			. ', status=' . ( isset( $booking->status ) ? $booking->status : 'n/a' )
+			. ', start_date=' . ( isset( $booking->start_date ) ? $booking->start_date : 'n/a' )
+			. ', start_time=' . ( isset( $booking->start_time ) ? $booking->start_time : 'n/a' ) . ').' );
 		if ( ! $this->agent_matches( isset( $booking->agent_id ) ? $booking->agent_id : 0 ) ) {
+			LPICS_CalDAV_Client::log( 'upsert skipped: booking agent_id does not match the configured agent ('
+				. LPICS_Options::agent_id() . ').' );
 			return;
 		}
 
-		$existing_href = $booking->get_meta_by_key( LPICS_EVENT_META_KEY, '' );
+		$existing_href = $this->get_booking_href( $booking );
 
 		// If the booking no longer occupies time (cancelled/no-show), remove any event.
 		if ( isset( $booking->status ) && ! $this->status_occupies_time( $booking->status ) ) {
 			if ( $existing_href ) {
 				LPICS_CalDAV_Client::delete_event( $existing_href );
-				$booking->save_meta_by_key( LPICS_EVENT_META_KEY, '' );
+				$this->set_booking_href( $booking, '' );
 			}
 			return;
 		}
@@ -162,6 +261,8 @@ class LPICS_Sync {
 			$booking->end_time
 		);
 		if ( ! $start || ! $end || $end <= $start ) {
+			LPICS_CalDAV_Client::log( 'upsert skipped for booking #' . $booking->id
+				. ': could not build a valid start/end time from start_date/start_time/end_time.' );
 			return;
 		}
 
@@ -178,12 +279,16 @@ class LPICS_Sync {
 			if ( ! $ok ) {
 				// Event vanished on iCloud, recreate it.
 				$new_href = LPICS_CalDAV_Client::insert_event( $event );
-				$booking->save_meta_by_key( LPICS_EVENT_META_KEY, $new_href ? $new_href : '' );
+				$this->set_booking_href( $booking, $new_href ? $new_href : '' );
 			}
 		} else {
 			$new_href = LPICS_CalDAV_Client::insert_event( $event );
 			if ( $new_href ) {
-				$booking->save_meta_by_key( LPICS_EVENT_META_KEY, $new_href );
+				$this->set_booking_href( $booking, $new_href );
+				LPICS_CalDAV_Client::log( 'inserted iCloud event for booking #' . $booking->id . ' at ' . $new_href );
+			} else {
+				LPICS_CalDAV_Client::log( 'insert_event returned empty for booking #' . $booking->id
+					. ' (see the HTTP error logged above).' );
 			}
 		}
 	}

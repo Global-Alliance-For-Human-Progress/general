@@ -52,6 +52,7 @@ class LPICS_Settings {
 			LPICS_Options::set( 'agent_id', (int) ( $_POST['lpics_agent_id'] ?? 0 ) );
 			LPICS_Options::set( 'sync_out', isset( $_POST['lpics_sync_out'] ) ? '1' : '0' );
 			LPICS_Options::set( 'block_busy', isset( $_POST['lpics_block_busy'] ) ? '1' : '0' );
+			LPICS_Options::set( 'notify_on_create', isset( $_POST['lpics_notify_on_create'] ) ? '1' : '0' );
 
 			// Record the chosen calendar (value is the absolute CalDAV URL).
 			$chosen_url = esc_url_raw( wp_unslash( $_POST['lpics_calendar_url'] ?? '' ) );
@@ -84,6 +85,21 @@ class LPICS_Settings {
 				set_transient( 'lpics_flash_error', $result['error'], 60 );
 			}
 			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=' . $status ) );
+			exit;
+		}
+
+		// 2b) Send a real test event into the target calendar (diagnostic).
+		if ( isset( $_POST['lpics_test_event'] ) ) {
+			check_admin_referer( 'lpics_test_event' );
+			$result = LPICS_CalDAV_Client::probe_write();
+			if ( $result['ok'] ) {
+				set_transient( 'lpics_flash_success', 'Test event written to "' . LPICS_Options::get( 'calendar_label' )
+					. '" for ' . $result['when'] . '. Open Apple Calendar and confirm it appears, then delete it. '
+					. 'If it shows up here but your bookings do not, the problem is on the LatePoint side (check debug.log for [LPICS] lines).', 120 );
+			} else {
+				set_transient( 'lpics_flash_error', 'Test event failed: ' . $result['error'], 120 );
+			}
+			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=test_event' ) );
 			exit;
 		}
 
@@ -159,6 +175,7 @@ class LPICS_Settings {
 		$calendar_lbl  = LPICS_Options::get( 'calendar_label' );
 		$sync_out      = LPICS_Options::sync_out_enabled();
 		$block_busy    = LPICS_Options::block_busy_enabled();
+		$notify_create = LPICS_Options::notify_on_create_enabled();
 		$auth_error    = LPICS_Options::get( 'last_auth_error' );
 		$agents        = $this->get_agents();
 		$calendars     = LPICS_Options::get( 'calendars', array() );
@@ -168,6 +185,10 @@ class LPICS_Settings {
 		$flash_error = get_transient( 'lpics_flash_error' );
 		if ( $flash_error ) {
 			delete_transient( 'lpics_flash_error' );
+		}
+		$flash_success = get_transient( 'lpics_flash_success' );
+		if ( $flash_success ) {
+			delete_transient( 'lpics_flash_success' );
 		}
 		$status = isset( $_GET['lpics_status'] ) ? sanitize_text_field( wp_unslash( $_GET['lpics_status'] ) ) : '';
 		?>
@@ -182,6 +203,10 @@ class LPICS_Settings {
 				<div class="notice notice-success is-dismissible"><p>iCloud account disconnected.</p></div>
 			<?php elseif ( 'cache_cleared' === $status ) : ?>
 				<div class="notice notice-success is-dismissible"><p>Cached busy times cleared.</p></div>
+			<?php endif; ?>
+
+			<?php if ( $flash_success ) : ?>
+				<div class="notice notice-success is-dismissible"><p><?php echo esc_html( $flash_success ); ?></p></div>
 			<?php endif; ?>
 
 			<?php if ( $flash_error ) : ?>
@@ -229,6 +254,9 @@ class LPICS_Settings {
 						<button class="button" name="lpics_test" value="1">Test connection / reload calendars</button>
 					</form>
 					<?php if ( $connected ) : ?>
+						<form method="post"><?php wp_nonce_field( 'lpics_test_event' ); ?>
+							<button class="button button-primary" name="lpics_test_event" value="1">Send test event now</button>
+						</form>
 						<form method="post"><?php wp_nonce_field( 'lpics_clear_cache' ); ?>
 							<button class="button" name="lpics_clear_cache" value="1">Refresh busy times now</button>
 						</form>
@@ -306,11 +334,15 @@ class LPICS_Settings {
 								<input type="checkbox" name="lpics_sync_out" value="1" <?php checked( $sync_out ); ?>>
 								Push LatePoint bookings into the iCloud calendar
 							</label>
-							<label style="display:block;">
+							<label style="display:block;margin-bottom:8px;">
 								<input type="checkbox" name="lpics_block_busy" value="1" <?php checked( $block_busy ); ?>>
 								Block LatePoint availability using the iCloud calendar's busy times
 							</label>
-							<p class="description">Note: all-day iCloud events (birthdays, holidays) do not block bookings by default, and events marked &ldquo;free&rdquo; are ignored. See readme.txt.</p>
+							<label style="display:block;">
+								<input type="checkbox" name="lpics_notify_on_create" value="1" <?php checked( $notify_create ); ?>>
+								Alert me when a new booking is created (adds a calendar notification a couple of minutes after each new booking)
+							</label>
+							<p class="description">Note: all-day iCloud events (birthdays, holidays) do not block bookings by default, and events marked &ldquo;free&rdquo; are ignored. The new-booking alert attaches a real calendar alarm to each new event, so it fires on your Apple devices a couple of minutes after the booking syncs (not before the appointment). See readme.txt.</p>
 						</td>
 					</tr>
 				</table>

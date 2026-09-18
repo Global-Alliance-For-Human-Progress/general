@@ -2,7 +2,7 @@
 /**
  * Plugin Name: LatePoint iCloud Calendar Sync (Two-Way)
  * Description: Free two-way Apple iCloud Calendar sync for LatePoint over CalDAV. Pushes LatePoint bookings into an iCloud calendar, and blocks LatePoint availability using that calendar's busy times. Companion plugin, LatePoint must be active.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Liam Bartsch
  * License: GPL-2.0-or-later
  * Requires PHP: 7.4
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LPICS_VERSION', '1.0.0' );
+define( 'LPICS_VERSION', '1.1.0' );
 define( 'LPICS_FILE', __FILE__ );
 define( 'LPICS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LPICS_SETTINGS_SLUG', 'lpics-settings' );
@@ -67,6 +67,11 @@ class LPICS_Options {
 
 	public static function block_busy_enabled() {
 		return self::get( 'block_busy', '1' ) === '1';
+	}
+
+	/** Attach a "new booking" alarm to freshly-created events so the owner is alerted. */
+	public static function notify_on_create_enabled() {
+		return self::get( 'notify_on_create', '1' ) === '1';
 	}
 
 	/** Absolute CalDAV URL of the chosen calendar collection. */

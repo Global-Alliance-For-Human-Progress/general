@@ -3,7 +3,7 @@ Contributors: Liam Bartsch
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 
 Free two-way Apple iCloud Calendar sync for LatePoint, over CalDAV, as a
@@ -113,6 +113,21 @@ or run only one. They use separate booking meta keys so they will not corrupt
 each other, but syncing the same booking into two places at once is confusing.
 
 == Changelog ==
+
+= 1.1.0 =
+* Sync out now runs in the background (WP-Cron) instead of on the booking-save
+  request, so a slow or failing iCloud call can no longer make LatePoint's
+  "Create Order" screen hang. Bookings save instantly and sync a moment later.
+* Booking hooks are fully exception-guarded and tolerate LatePoint API
+  differences, so nothing this plugin does can break LatePoint's save flow.
+* Added a "Send test event now" button on the settings page that writes a real
+  event to the target calendar and reports the exact result, for quick
+  diagnosis of sync-out problems.
+* Optional "Alert me when a new booking is created" setting: attaches a
+  calendar alarm to each new synced event so your Apple devices ping shortly
+  after a booking comes in. On by default; toggle it under "What to sync".
+  Adjust the delay with the `lpics_creation_alarm_offset_seconds` filter.
+* More detailed [LPICS] debug logging around the booking sync path.
 
 = 1.0.0 =
 * Initial release: two-way sync over CalDAV (bookings -> iCloud events, iCloud
