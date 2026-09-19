@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Turso Database Usage Percentage
 // @namespace    http://tampermonkey.net/
-// @version      2026.09.11
+// @version      2026.09.19
 // @description  Shows exact color-coded usage percentages for Turso database reads, writes, and syncs
 // @author       You
-// @match        https://app.turso.tech/*/analytics*
+// @match        https://app.turso.tech/*
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -12,11 +12,8 @@
 (function() {
     'use strict';
 
-    // shadcn's Progress component renders the fill as translateX(-(100 - value)%),
-    // so the real percentage can be read straight off that transform instead of
-    // reparsing the abbreviated "1.21M / 500M" text.
     function getPercentageFromBar(indicator) {
-        const match = indicator.style.transform.match(/translateX\(-([\d.]+)%\)/);
+        const match = indicator.style.transform.match(/translateX\(-([\d.]+)\%\)/);
         if (!match) return null;
         return 100 - parseFloat(match[1]);
     }
@@ -41,6 +38,8 @@
     }
 
     function injectTursoUsage() {
+        if (!window.location.pathname.includes('/analytics')) return;
+
         const indicators = document.querySelectorAll('[data-slot="progress-indicator"]');
 
         indicators.forEach((indicator) => {
@@ -56,7 +55,6 @@
 
             const color = colorFor(pct);
 
-            // Recolor the actual bar so it visually matches the badge
             indicator.style.backgroundColor = color;
             track.style.backgroundColor = `${color}33`;
 
