@@ -375,10 +375,17 @@ class LPICS_CalDAV_Client {
 			return array( 'ok' => false, 'error' => $res->get_error_message() );
 		}
 		if ( $res['code'] >= 200 && $res['code'] < 300 ) {
+			// Read the event back so the admin can see exactly what iCloud stored
+			// (iCloud may rewrite or drop parts of the upload, e.g. the alarm).
+			$stored = self::request( 'GET', $url );
 			return array(
-				'ok'   => true,
-				'href' => $url,
-				'when' => $start->format( 'D, M j Y, H:i' ) . ' (' . $tz->getName() . ')',
+				'ok'         => true,
+				'href'       => $url,
+				'when'       => $start->format( 'D, M j Y, H:i' ) . ' (' . $tz->getName() . ')',
+				'sent_ics'   => $ics,
+				'stored_ics' => ( ! is_wp_error( $stored ) && 200 === $stored['code'] )
+					? (string) $stored['body']
+					: 'GET failed: ' . ( is_wp_error( $stored ) ? $stored->get_error_message() : 'HTTP ' . $stored['code'] ),
 			);
 		}
 		$body = trim( wp_strip_all_tags( (string) $res['body'] ) );
@@ -386,6 +393,71 @@ class LPICS_CalDAV_Client {
 			'ok'    => false,
 			'error' => 'iCloud returned HTTP ' . $res['code'] . ' when writing the event.'
 				. ( '' !== $body ? ' Response: ' . substr( $body, 0, 300 ) : '' ),
+		);
+	}
+
+	/**
+	 * Diagnostic: fetch the raw ICS (exactly as iCloud stores it) of the most
+	 * recently created/modified events in the target calendar, so an event made on
+	 * an iPhone can be compared line by line with one this plugin wrote.
+	 * Returns [ 'ok' => bool, 'error' => string, 'events' => string[] ].
+	 */
+	public static function recent_events_raw( $limit = 4 ) {
+		$calendar = LPICS_Options::calendar_url();
+		if ( ! $calendar ) {
+			return array( 'ok' => false, 'error' => 'No target calendar is selected.' );
+		}
+
+		$from = gmdate( 'Ymd\THis\Z', time() - 2 * DAY_IN_SECONDS );
+		$to   = gmdate( 'Ymd\THis\Z', time() + 60 * DAY_IN_SECONDS );
+		$body = '<?xml version="1.0" encoding="utf-8"?>'
+			. '<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
+			. '<d:prop><c:calendar-data/></d:prop>'
+			. '<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT">'
+			. '<c:time-range start="' . $from . '" end="' . $to . '"/>'
+			. '</c:comp-filter></c:comp-filter></c:filter>'
+			. '</c:calendar-query>';
+
+		$res = self::request( 'REPORT', $calendar, array(
+			'Content-Type' => 'application/xml; charset=utf-8',
+		), $body, '1' );
+
+		if ( is_wp_error( $res ) ) {
+			return array( 'ok' => false, 'error' => $res->get_error_message() );
+		}
+		if ( $res['code'] < 200 || $res['code'] >= 300 ) {
+			return array( 'ok' => false, 'error' => 'iCloud returned HTTP ' . $res['code'] . ' for the event query.' );
+		}
+
+		$dom = self::load_xml( $res['body'] );
+		if ( ! $dom ) {
+			return array( 'ok' => false, 'error' => 'Could not parse the iCloud response.' );
+		}
+
+		$events = array();
+		foreach ( $dom->getElementsByTagNameNS( 'urn:ietf:params:xml:ns:caldav', 'calendar-data' ) as $node ) {
+			$ics = trim( $node->textContent );
+			if ( '' === $ics ) {
+				continue;
+			}
+			// Sort key: newest of CREATED / LAST-MODIFIED / DTSTAMP.
+			$key = '';
+			foreach ( array( 'CREATED', 'LAST-MODIFIED', 'DTSTAMP' ) as $prop ) {
+				if ( preg_match( '/^' . $prop . '[^:\r\n]*:(\S+)/m', $ics, $m ) && strcmp( $m[1], $key ) > 0 ) {
+					$key = $m[1];
+				}
+			}
+			$events[] = array( 'key' => $key, 'ics' => $ics );
+		}
+		usort( $events, function ( $a, $b ) {
+			return strcmp( $b['key'], $a['key'] );
+		} );
+
+		return array(
+			'ok'     => true,
+			'events' => array_map( function ( $e ) {
+				return $e['ics'];
+			}, array_slice( $events, 0, (int) $limit ) ),
 		);
 	}
 
@@ -555,6 +627,11 @@ class LPICS_CalDAV_Client {
 		$lines[] = 'BEGIN:VEVENT';
 		$lines[] = 'UID:' . $uid;
 		$lines[] = 'DTSTAMP:' . $now;
+		$lines[] = 'CREATED:' . $now;
+		$lines[] = 'LAST-MODIFIED:' . $now;
+		$lines[] = 'SEQUENCE:0';
+		$lines[] = 'STATUS:CONFIRMED';
+		$lines[] = 'TRANSP:OPAQUE';
 		$lines[] = 'DTSTART:' . $start->format( 'Ymd\THis\Z' );
 		$lines[] = 'DTEND:' . $end->format( 'Ymd\THis\Z' );
 		$lines[] = 'SUMMARY:' . $summary;
@@ -571,12 +648,26 @@ class LPICS_CalDAV_Client {
 			if ( $offset < 0 ) {
 				$offset = 0;
 			}
-			$trigger    = gmdate( 'Ymd\THis\Z', time() + $offset );
+			$fire_at    = time() + $offset;
+			$until      = $start->getTimestamp() - $fire_at;
+			// iOS always writes relative triggers and the 17 Pro Max ignored our
+			// absolute one, so express the same moment as "N seconds before start".
+			// Fall back to absolute only if the event starts before the alarm time.
+			if ( $until >= 0 ) {
+				$trigger_line = 'TRIGGER;RELATED=START:-PT' . $until . 'S';
+			} else {
+				$trigger_line = 'TRIGGER;VALUE=DATE-TIME:' . gmdate( 'Ymd\THis\Z', $fire_at );
+			}
 			$alarm_text = '' !== $summary ? $summary : 'New booking'; // $summary is already ICS-escaped above
+			// iOS writes its own alarms with a UID and X-WR-ALARMUID; newer iOS
+			// builds can ignore foreign alarms that lack them, so mirror that shape.
+			$alarm_uid  = strtoupper( wp_generate_uuid4() );
 			$lines[]    = 'BEGIN:VALARM';
+			$lines[]    = 'X-WR-ALARMUID:' . $alarm_uid;
+			$lines[]    = 'UID:' . $alarm_uid;
 			$lines[]    = 'ACTION:DISPLAY';
 			$lines[]    = 'DESCRIPTION:' . $alarm_text;
-			$lines[]    = 'TRIGGER;VALUE=DATE-TIME:' . $trigger;
+			$lines[]    = $trigger_line;
 			$lines[]    = 'END:VALARM';
 		}
 

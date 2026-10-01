@@ -36,6 +36,9 @@ class LPICS_Sync {
 			add_action( 'latepoint_booking_will_be_deleted', array( $this, 'on_booking_will_be_deleted' ), 20, 1 );
 		}
 
+		// Instant push via ntfy, independent of the iCloud sync above.
+		add_action( 'latepoint_booking_created', array( $this, 'notify_ntfy_booking_created' ), 30, 1 );
+
 		// Background worker. Registered unconditionally so any already-queued
 		// event still resolves even if sync-out was toggled off in the meantime.
 		add_action( self::CRON_HOOK, array( $this, 'process_scheduled_sync' ), 10, 3 );
@@ -186,6 +189,32 @@ class LPICS_Sync {
 		if ( is_object( $booking ) && ! empty( $booking->id ) ) {
 			$this->schedule( 'upsert', (int) $booking->id );
 		}
+	}
+
+	public function notify_ntfy_booking_created( $booking ) {
+		if ( ! LPICS_Ntfy::is_enabled() || ! is_object( $booking ) || empty( $booking->id ) ) {
+			return;
+		}
+		try {
+			$loaded = $this->load_booking( (int) $booking->id );
+			$b      = $loaded ? $loaded : $booking;
+			$when   = trim( ( isset( $b->start_date ) ? $b->start_date : '' ) . ' ' . $this->format_time( isset( $b->start_time ) ? $b->start_time : null ) );
+			LPICS_Ntfy::send(
+				'New booking',
+				$this->event_summary( $b ) . ( '' !== $when ? "\n" . $when : '' ),
+				false
+			);
+		} catch ( \Throwable $e ) {
+			LPICS_CalDAV_Client::log( 'ntfy notify error: ' . $e->getMessage() );
+		}
+	}
+
+	/** LatePoint stores times as minutes since midnight; render as HH:MM. */
+	private function format_time( $minutes ) {
+		if ( null === $minutes || '' === $minutes || ! is_numeric( $minutes ) ) {
+			return '';
+		}
+		return sprintf( '%02d:%02d', intdiv( (int) $minutes, 60 ), (int) $minutes % 60 );
 	}
 
 	public function on_booking_updated( $booking, $old_booking = null ) {

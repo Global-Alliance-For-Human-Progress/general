@@ -53,6 +53,8 @@ class LPICS_Settings {
 			LPICS_Options::set( 'sync_out', isset( $_POST['lpics_sync_out'] ) ? '1' : '0' );
 			LPICS_Options::set( 'block_busy', isset( $_POST['lpics_block_busy'] ) ? '1' : '0' );
 			LPICS_Options::set( 'notify_on_create', isset( $_POST['lpics_notify_on_create'] ) ? '1' : '0' );
+			LPICS_Options::set( 'ntfy_topic', preg_replace( '/[^A-Za-z0-9_-]/', '', (string) wp_unslash( $_POST['lpics_ntfy_topic'] ?? '' ) ) );
+			LPICS_Options::set( 'ntfy_server', untrailingslashit( esc_url_raw( wp_unslash( $_POST['lpics_ntfy_server'] ?? '' ) ) ) );
 
 			// Record the chosen calendar (value is the absolute CalDAV URL).
 			$chosen_url = esc_url_raw( wp_unslash( $_POST['lpics_calendar_url'] ?? '' ) );
@@ -92,14 +94,57 @@ class LPICS_Settings {
 		if ( isset( $_POST['lpics_test_event'] ) ) {
 			check_admin_referer( 'lpics_test_event' );
 			$result = LPICS_CalDAV_Client::probe_write();
+
+			// Mirror a real booking: it creates the event and sends the push together.
+			$push_note = '';
+			if ( LPICS_Ntfy::is_enabled() ) {
+				$push = LPICS_Ntfy::send( 'New booking (test)', 'LatePoint iCloud Sync - test event' . ( $result['ok'] ? "\n" . $result['when'] : '' ) );
+				$push_note = $push['ok']
+					? ' Push sent to ntfy topic "' . LPICS_Ntfy::topic() . '".'
+					: ' ntfy push failed: ' . $push['error'];
+			}
+
 			if ( $result['ok'] ) {
 				set_transient( 'lpics_flash_success', 'Test event written to "' . LPICS_Options::get( 'calendar_label' )
-					. '" for ' . $result['when'] . '. Open Apple Calendar and confirm it appears, then delete it. '
+					. '" for ' . $result['when'] . '.' . $push_note . ' Open Apple Calendar and confirm it appears, then delete it. '
 					. 'If it shows up here but your bookings do not, the problem is on the LatePoint side (check debug.log for [LPICS] lines).', 120 );
+				set_transient( 'lpics_flash_ics', "=== SENT ===\n" . $result['sent_ics'] . "\n=== STORED BY ICLOUD ===\n" . $result['stored_ics'], 600 );
 			} else {
-				set_transient( 'lpics_flash_error', 'Test event failed: ' . $result['error'], 120 );
+				set_transient( 'lpics_flash_error', 'Test event failed: ' . $result['error'] . $push_note, 120 );
 			}
 			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=test_event' ) );
+			exit;
+		}
+
+		// 2c) Dump the newest events of the target calendar as iCloud stores them (diagnostic).
+		if ( isset( $_POST['lpics_show_events'] ) ) {
+			check_admin_referer( 'lpics_show_events' );
+			$result = LPICS_CalDAV_Client::recent_events_raw( 4 );
+			if ( $result['ok'] && $result['events'] ) {
+				set_transient( 'lpics_flash_success', 'Showing the ' . count( $result['events'] ) . ' newest event(s) in "' . LPICS_Options::get( 'calendar_label' ) . '" (newest first).', 120 );
+				set_transient( 'lpics_flash_ics', implode( "
+
+=== NEXT EVENT ===
+", $result['events'] ), 600 );
+			} elseif ( $result['ok'] ) {
+				set_transient( 'lpics_flash_error', 'No events found in the target calendar in the last 2 days / next 60 days.', 120 );
+			} else {
+				set_transient( 'lpics_flash_error', 'Could not read events: ' . $result['error'], 120 );
+			}
+			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=show_events' ) );
+			exit;
+		}
+
+		// 2d) Send a real ntfy push so the admin can confirm it reaches their phones.
+		if ( isset( $_POST['lpics_test_ntfy'] ) ) {
+			check_admin_referer( 'lpics_test_ntfy' );
+			$result = LPICS_Ntfy::send( 'LatePoint test', 'If you can read this, ntfy push notifications work.' );
+			if ( $result['ok'] ) {
+				set_transient( 'lpics_flash_success', 'Test notification sent to ntfy topic "' . LPICS_Ntfy::topic() . '". It should arrive on every phone subscribed to that topic within a few seconds.', 120 );
+			} else {
+				set_transient( 'lpics_flash_error', 'ntfy test failed: ' . $result['error'], 120 );
+			}
+			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=test_ntfy' ) );
 			exit;
 		}
 
@@ -190,6 +235,10 @@ class LPICS_Settings {
 		if ( $flash_success ) {
 			delete_transient( 'lpics_flash_success' );
 		}
+		$flash_ics = get_transient( 'lpics_flash_ics' );
+		if ( $flash_ics ) {
+			delete_transient( 'lpics_flash_ics' );
+		}
 		$status = isset( $_GET['lpics_status'] ) ? sanitize_text_field( wp_unslash( $_GET['lpics_status'] ) ) : '';
 		?>
 		<div class="wrap">
@@ -206,7 +255,12 @@ class LPICS_Settings {
 			<?php endif; ?>
 
 			<?php if ( $flash_success ) : ?>
-				<div class="notice notice-success is-dismissible"><p><?php echo esc_html( $flash_success ); ?></p></div>
+				<div class="notice notice-success is-dismissible"><p><?php echo esc_html( $flash_success ); ?></p>
+					<?php if ( $flash_ics ) : ?>
+						<details><summary>Raw event data (sent vs. stored by iCloud)</summary>
+							<pre style="white-space:pre-wrap;user-select:all;"><?php echo esc_html( $flash_ics ); ?></pre></details>
+					<?php endif; ?>
+				</div>
 			<?php endif; ?>
 
 			<?php if ( $flash_error ) : ?>
@@ -256,6 +310,9 @@ class LPICS_Settings {
 					<?php if ( $connected ) : ?>
 						<form method="post"><?php wp_nonce_field( 'lpics_test_event' ); ?>
 							<button class="button button-primary" name="lpics_test_event" value="1">Send test event now</button>
+						</form>
+						<form method="post"><?php wp_nonce_field( 'lpics_show_events' ); ?>
+							<button class="button" name="lpics_show_events" value="1">Show recent events (raw)</button>
 						</form>
 						<form method="post"><?php wp_nonce_field( 'lpics_clear_cache' ); ?>
 							<button class="button" name="lpics_clear_cache" value="1">Refresh busy times now</button>
@@ -345,10 +402,28 @@ class LPICS_Settings {
 							<p class="description">Note: all-day iCloud events (birthdays, holidays) do not block bookings by default, and events marked &ldquo;free&rdquo; are ignored. The new-booking alert attaches a real calendar alarm to each new event, so it fires on your Apple devices a couple of minutes after the booking syncs (not before the appointment). See readme.txt.</p>
 						</td>
 					</tr>
+					<tr>
+						<th scope="row">Instant push (ntfy)</th>
+						<td>
+							<label style="display:block;margin-bottom:8px;">Topic<br>
+								<input type="text" class="regular-text" name="lpics_ntfy_topic" value="<?php echo esc_attr( LPICS_Ntfy::topic() ); ?>" placeholder="e.g. <?php echo esc_attr( 'latepoint-' . strtolower( wp_generate_password( 12, false ) ) ); ?>" autocomplete="off">
+							</label>
+							<label style="display:block;">Server (optional)<br>
+								<input type="url" class="regular-text" name="lpics_ntfy_server" value="<?php echo esc_attr( (string) LPICS_Options::get( 'ntfy_server', '' ) ); ?>" placeholder="<?php echo esc_attr( LPICS_Ntfy::DEFAULT_SERVER ); ?>">
+							</label>
+							<p class="description">Sends a push the moment a booking is created, independent of Apple Calendar. Install the free <strong>ntfy</strong> app on each phone and subscribe to this topic. No account or API key is needed. The topic acts like a password, so use a long random name. Leave empty to disable. Save, then use the test button below.</p>
+						</td>
+					</tr>
 				</table>
 
 				<p class="submit"><button class="button button-primary" name="lpics_save_settings" value="1">Save settings</button></p>
 			</form>
+
+			<?php if ( LPICS_Ntfy::is_enabled() ) : ?>
+				<form method="post" style="margin-top:12px;"><?php wp_nonce_field( 'lpics_test_ntfy' ); ?>
+					<button class="button" name="lpics_test_ntfy" value="1">Send test notification (ntfy)</button>
+				</form>
+			<?php endif; ?>
 		</div>
 		<?php
 	}

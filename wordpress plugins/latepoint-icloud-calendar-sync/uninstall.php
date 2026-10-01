@@ -21,6 +21,8 @@ $options = array(
 	'lpics_sync_out',
 	'lpics_block_busy',
 	'lpics_notify_on_create',
+	'lpics_ntfy_topic',
+	'lpics_ntfy_server',
 	'lpics_last_auth_error',
 );
 foreach ( $options as $option ) {

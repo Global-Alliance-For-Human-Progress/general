@@ -33,6 +33,7 @@ define( 'LPICS_SETTINGS_SLUG', 'lpics-settings' );
 define( 'LPICS_EVENT_META_KEY', 'lpics_event_href' );
 
 require_once LPICS_DIR . 'includes/class-lpics-caldav-client.php';
+require_once LPICS_DIR . 'includes/class-lpics-ntfy.php';
 require_once LPICS_DIR . 'includes/class-lpics-settings.php';
 require_once LPICS_DIR . 'includes/class-lpics-sync.php';
 
