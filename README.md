@@ -13,13 +13,21 @@ General repo for hosting useful tools and scripts.
 
 ## Tamper Monkey Scripts
 
-Browser userscripts for enhanced productivity:
+Browser userscripts for enhanced productivity, grouped into one folder per application:
 
-- **chatgpt_button_clicker.js** - Makes Enter send ChatGPT messages, Shift+Enter creates newlines
-- **tiktok_loop_fix.js** - Forces TikTok videos to loop continuously
-- **jira_show_full_work_team_no_scroll.js** - Removes height constraints on Jira Team Workload gadget to show full content without scrolling
-- **claude_usage_weekly_progress.js** - Adds a weekly cycle elapsed progress bar to Claude usage tracker
-- **modmail_turbo_scroll.js** - Auto-scrolls through entire Reddit modmail history to quickly navigate to oldest messages
+- **ampeco/** - SSO auto-login for the Ampeco admin (generic template; the site-specific copy is gitignored)
+- **chatgpt/** - Enter sends, Shift+Enter creates newlines
+- **claude/** - Claude usage tracker with dynamic colors
+- **facebook/**, **instagram/**, **tiktok/**, **youtube/** - Auto-unmute, background play, loop and bug fixes
+- **general/** - Scripts that apply to any site (universal dark mode)
+- **github/** - GHE SSO auto-continue (generic template; the site-specific copy is gitignored)
+- **jira/** - Removes height constraints on the Team Workload gadget
+- **linkedin/** - Unfollow all
+- **odoo/** - Debug mode and search focus fix
+- **reddit/** - Modmail turbo scroll
+- **render/** - Billing usage tracker with dynamic colors
+- **rexx/** - Translates the French rexx portal into near-native English
+- **turso/** - Database usage percentage badges
 
 ## PowerShell Windows
 

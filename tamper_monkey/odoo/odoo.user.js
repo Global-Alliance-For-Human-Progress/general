@@ -9,8 +9,8 @@
 // @match        *://*/odoo*
 // @match        *://*/web*
 // @run-at       document-start
-// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/odoo.user.js
-// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/odoo.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/odoo/odoo.user.js
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/odoo/odoo.user.js
 // @grant        none
 // ==/UserScript==
 
