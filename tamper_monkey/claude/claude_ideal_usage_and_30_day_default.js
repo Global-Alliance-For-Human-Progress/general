@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Claude Usage Tracker - Dynamic Colors
+// @name         Claude Usage Tracker - Ideal Usage and 30-Day Default
 // @namespace    http://tampermonkey.net/
-// @version      2026.09.17.2
-// @description  Adds a color-coded ideal usage limit progress bar to Claude usage meters.
+// @version      2026.10.02
+// @description  Adds a color-coded ideal usage limit progress bar to Claude usage meters, and defaults the usage date range to Last 30 days.
 // @author       You
 // @match        https://claude.ai/*
 // @grant        none
@@ -252,6 +252,47 @@
         }
     }
 
+    // The usage page's date range dropdown defaults to "This month" (hidden input value "mtd").
+    // Once per mounted dropdown, open it and pick "Last 30 days" instead. The popup is hidden
+    // via a temporary style while this runs so it doesn't flash on screen.
+    const handledRangeInputs = new WeakSet();
+    let selectingRange = false;
+
+    function ensureLast30Days() {
+        if (selectingRange) return;
+        const trigger = document.querySelector('[data-cds="FilterDateRange"] button[role="combobox"]');
+        const input = trigger?.closest('[data-cds="FilterDateRange"]')?.nextElementSibling;
+        if (!trigger || !input || input.tagName !== 'INPUT' || handledRangeInputs.has(input)) return;
+        handledRangeInputs.add(input);
+        if (input.value !== 'mtd') return; // already something other than the default
+
+        selectingRange = true;
+        const hide = document.createElement('style');
+        hide.textContent = 'div[role="dialog"][data-cds="FilterDateRange"] { opacity: 0 !important; }';
+        document.head.appendChild(hide);
+        const done = () => { hide.remove(); selectingRange = false; };
+
+        ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type =>
+            trigger.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }))
+        );
+
+        let tries = 0;
+        const poll = setInterval(() => {
+            const option = document.querySelector('[role="option"][title="Last 30 days"]');
+            if (option) {
+                clearInterval(poll);
+                ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(type =>
+                    option.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }))
+                );
+                setTimeout(done, 200);
+            } else if (++tries > 20) {
+                clearInterval(poll);
+                done();
+            }
+        }, 50);
+    }
+
+    setInterval(ensureLast30Days, 1000);
     setInterval(injectBars, 1000);
     setInterval(triggerUsageRefetch, 15000); // re-pull real usage numbers every 15s
 })();
