@@ -1,13 +1,40 @@
-=== LatePoint iCloud Calendar Sync (Two-Way) ===
+=== LatePoint Toolkit (iCloud Sync, Swiss Payments) ===
 Contributors: Liam Bartsch
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.1
 License: GPLv2 or later
 
-Free two-way Apple iCloud Calendar sync for LatePoint, over CalDAV, as a
-companion plugin.
+Free LatePoint add-ons as a companion plugin: two-way Apple iCloud Calendar sync
+over CalDAV with ntfy alerts, plus fee-free Swiss payment options (QR-bill bank
+transfer, manual TWINT, prepaid voucher codes).
+
+== Swiss payments (QR-bill, TWINT, vouchers) ==
+
+Configure under LatePoint Toolkit > Swiss Payments (sidebar). Verified against LatePoint
+5.7.3, public payment hooks only.
+
+- Pay on site: already built into LatePoint ("Pay Locally"), free. Enable it
+  under LatePoint > Settings > Payments.
+- Bank transfer (Swiss QR-bill): pay-later method. After booking the customer
+  sees a scannable Swiss QR code plus account, reference, amount and message,
+  and gets the same details by email. A QR-IBAN gets a QR reference (QRR), a
+  normal IBAN gets an ISO 11649 reference (RF...). The reference is derived from
+  the LatePoint order id. You mark the payment received in LatePoint
+  (Transactions).
+- TWINT (manual): pay-later method. The customer sends money to your TWINT
+  number with the booking code as message, you confirm it by hand. TWINT private
+  accounts are not meant for business use and payments cannot be matched
+  automatically. Check the TWINT terms or use a TWINT business account.
+- Vouchers: pay-now method. Create a code with a balance, the customer enters it
+  at checkout and the full amount due is deducted. The balance must cover the
+  whole amount, partial coverage is not supported. Redemptions are logged per
+  order intent and are idempotent.
+
+Notes: the voucher tables (wp_lpsp_vouchers, wp_lpsp_redemptions) are kept when
+the plugin is deleted because they hold customer balances. If an order fails
+after a voucher was redeemed, the balance is not restored automatically.
 
 == What it does ==
 
@@ -42,7 +69,7 @@ recurrence expansion), because iCloud offers no dedicated free/busy endpoint.
 
 == Install ==
 
-1. Zip the "latepoint-icloud-calendar-sync" folder.
+1. Zip the "latepoint-toolkit" folder.
 2. WP Admin -> Plugins -> Add New -> Upload Plugin -> choose the zip -> Install
    -> Activate.
 3. Go to Settings -> "LatePoint iCloud Sync".
@@ -113,6 +140,20 @@ or run only one. They use separate booking meta keys so they will not corrupt
 each other, but syncing the same booking into two places at once is confusing.
 
 == Changelog ==
+
+= 1.2.1 =
+* Settings now live under a top-level "LatePoint Toolkit" sidebar menu (iCloud
+  Sync, Swiss Payments) instead of under Settings, so they are easy to find.
+
+= 1.2.0 =
+* New Swiss payments module: QR-bill bank transfer, manual TWINT and prepaid
+  voucher codes as LatePoint payment methods, with their own settings page.
+  The plugin is now called "LatePoint Toolkit" and the folder is now
+  latepoint-toolkit. Existing iCloud sync settings are reused. To upgrade from
+  the old "latepoint-icloud-calendar-sync" folder: install and activate this
+  zip, but only DEACTIVATE the old plugin, do not delete it, because deleting
+  it runs its uninstall routine and erases the saved iCloud settings. If both
+  are active this plugin shows a notice instead of loading.
 
 = 1.1.0 =
 * Sync out now runs in the background (WP-Cron) instead of on the booking-save

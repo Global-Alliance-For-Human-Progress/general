@@ -20,9 +20,21 @@ class LPICS_Settings {
 	}
 
 	public function register_menu() {
-		add_options_page(
+		// Top-level "LatePoint Toolkit" menu; the first entry is the iCloud sync page.
+		// The Swiss payments page adds its own submenu entry (see LPSP_Settings).
+		add_menu_page(
+			'LatePoint Toolkit',
+			'LatePoint Toolkit',
+			'manage_options',
+			LPICS_SETTINGS_SLUG,
+			array( $this, 'render_page' ),
+			'dashicons-calendar-alt',
+			58
+		);
+		add_submenu_page(
+			LPICS_SETTINGS_SLUG,
 			'LatePoint iCloud Calendar Sync',
-			'LatePoint iCloud Sync',
+			'iCloud Sync',
 			'manage_options',
 			LPICS_SETTINGS_SLUG,
 			array( $this, 'render_page' )
@@ -74,7 +86,7 @@ class LPICS_Settings {
 				}
 			}
 
-			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=' . $status ) );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=' . $status ) );
 			exit;
 		}
 
@@ -86,7 +98,7 @@ class LPICS_Settings {
 			if ( ! $result['ok'] ) {
 				set_transient( 'lpics_flash_error', $result['error'], 60 );
 			}
-			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=' . $status ) );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=' . $status ) );
 			exit;
 		}
 
@@ -112,7 +124,7 @@ class LPICS_Settings {
 			} else {
 				set_transient( 'lpics_flash_error', 'Test event failed: ' . $result['error'] . $push_note, 120 );
 			}
-			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=test_event' ) );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=test_event' ) );
 			exit;
 		}
 
@@ -131,7 +143,7 @@ class LPICS_Settings {
 			} else {
 				set_transient( 'lpics_flash_error', 'Could not read events: ' . $result['error'], 120 );
 			}
-			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=show_events' ) );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=show_events' ) );
 			exit;
 		}
 
@@ -144,7 +156,7 @@ class LPICS_Settings {
 			} else {
 				set_transient( 'lpics_flash_error', 'ntfy test failed: ' . $result['error'], 120 );
 			}
-			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=test_ntfy' ) );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=test_ntfy' ) );
 			exit;
 		}
 
@@ -157,7 +169,7 @@ class LPICS_Settings {
 			LPICS_Options::delete( 'calendars' );
 			LPICS_Options::delete( 'calendar_home' );
 			LPICS_Options::delete( 'last_auth_error' );
-			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=disconnected' ) );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=disconnected' ) );
 			exit;
 		}
 
@@ -165,7 +177,7 @@ class LPICS_Settings {
 		if ( isset( $_POST['lpics_clear_cache'] ) ) {
 			check_admin_referer( 'lpics_clear_cache' );
 			$this->clear_busy_cache();
-			wp_safe_redirect( admin_url( 'options-general.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=cache_cleared' ) );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . LPICS_SETTINGS_SLUG . '&lpics_status=cache_cleared' ) );
 			exit;
 		}
 	}
