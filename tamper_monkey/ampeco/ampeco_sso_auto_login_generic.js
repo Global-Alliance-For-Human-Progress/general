@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         SSO Auto-Login
+// @name         Ampeco SSO Auto-Login
 // @namespace    https://example-admin-instance.example.com/
-// @version      2026.09.21
+// @version      2026.10.12
 // @description  Auto-clicks the SSO login button on an admin login page
 // @match        https://example-admin-instance.example.com/*
 // @grant        none
