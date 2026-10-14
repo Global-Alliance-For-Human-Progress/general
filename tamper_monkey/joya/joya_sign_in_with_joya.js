@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         Joya Portal Auto Sign in with Joya
 // @namespace    https://portal-test.joya.ch/
-// @version      2026.10.12
+// @version      2026.10.14.1
 // @description  Auto-clicks the "Sign in with Joya" button on the Joya portal login page
 // @match        https://portal-test.joya.ch/*/login*
+// @match        https://portal.joya.ch/*/login*
 // @grant        none
 // ==/UserScript==
 
@@ -31,13 +32,26 @@
     return false;
   }
 
-  if (clickIfPresent()) return;
+  // The page is server-rendered, so the button can exist before its click handler
+  // is attached (hydration). Wait for load, then retry the click a few times in case
+  // the first one is ignored. Stops on its own once the page navigates away.
+  const MAX_ATTEMPTS = 10;
+  const RETRY_MS = 500;
 
-  const observer = new MutationObserver(() => {
-    if (clickIfPresent()) {
-      observer.disconnect();
-    }
-  });
+  function start() {
+    let attempts = 0;
+    const timer = setInterval(() => {
+      attempts += 1;
+      clickIfPresent();
+      if (attempts >= MAX_ATTEMPTS) {
+        clearInterval(timer);
+      }
+    }, RETRY_MS);
+  }
 
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  if (document.readyState === 'complete') {
+    start();
+  } else {
+    window.addEventListener('load', start, { once: true });
+  }
 })();
