@@ -91,6 +91,10 @@ class LPICS_Sync {
 				}
 				return;
 			}
+			if ( 'ntfy' === $op ) {
+				$this->send_ntfy_for_booking( (int) $booking_id );
+				return;
+			}
 			$booking = $this->load_booking( (int) $booking_id );
 			if ( ! $booking ) {
 				LPICS_CalDAV_Client::log( 'scheduled upsert: booking #' . (int) $booking_id . ' no longer loadable.' );
@@ -195,18 +199,32 @@ class LPICS_Sync {
 		if ( ! LPICS_Ntfy::is_enabled() || ! is_object( $booking ) || empty( $booking->id ) ) {
 			return;
 		}
-		try {
-			$loaded = $this->load_booking( (int) $booking->id );
-			$b      = $loaded ? $loaded : $booking;
-			$when   = trim( ( isset( $b->start_date ) ? $b->start_date : '' ) . ' ' . $this->format_time( isset( $b->start_time ) ? $b->start_time : null ) );
-			LPICS_Ntfy::send(
-				'New booking',
-				$this->event_summary( $b ) . ( '' !== $when ? "\n" . $when : '' ),
-				false
-			);
-		} catch ( \Throwable $e ) {
-			LPICS_CalDAV_Client::log( 'ntfy notify error: ' . $e->getMessage() );
+		// A non-blocking HTTPS request is often dropped before it is sent, so the
+		// push goes out from the cron worker as a normal, waited-for request.
+		$this->record_ntfy( 'booking #' . (int) $booking->id . ' created, push queued.' );
+		$this->schedule( 'ntfy', (int) $booking->id );
+	}
+
+	/** Cron worker for the ntfy push: send it for real and record the outcome. */
+	private function send_ntfy_for_booking( $booking_id ) {
+		$b = $this->load_booking( (int) $booking_id );
+		if ( ! $b ) {
+			$this->record_ntfy( 'booking #' . (int) $booking_id . ' could not be loaded, no push sent.' );
+			return;
 		}
+		$when = trim( ( isset( $b->start_date ) ? $b->start_date : '' ) . ' ' . $this->format_time( isset( $b->start_time ) ? $b->start_time : null ) );
+		$res  = LPICS_Ntfy::send(
+			'New booking',
+			$this->event_summary( $b ) . ( '' !== $when ? "\n" . $when : '' ),
+			true
+		);
+		$this->record_ntfy( 'booking #' . (int) $booking_id . ': ' . ( $res['ok'] ? 'push sent.' : 'push FAILED: ' . $res['error'] ) );
+	}
+
+	/** Log and store the latest ntfy step so the settings page can show it without WP_DEBUG. */
+	private function record_ntfy( $msg ) {
+		LPICS_CalDAV_Client::log( 'ntfy: ' . $msg );
+		update_option( 'lpics_last_ntfy', array( 'time' => time(), 'msg' => $msg ), false );
 	}
 
 	/** LatePoint stores times as minutes since midnight; render as HH:MM. */

@@ -3,7 +3,7 @@ Contributors: Liam Bartsch
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.2.4
+Stable tag: 1.2.5
 License: GPLv2 or later
 
 Free LatePoint add-ons as a companion plugin: two-way Apple iCloud Calendar sync
@@ -140,6 +140,13 @@ or run only one. They use separate booking meta keys so they will not corrupt
 each other, but syncing the same booking into two places at once is confusing.
 
 == Changelog ==
+
+= 1.2.5 =
+* Fix: the ntfy push for a new booking was sent as a fire-and-forget HTTPS
+  request that WordPress often drops before it goes out (the test button worked
+  because it waits for the reply). The push now goes out from the background
+  queue as a normal request, and the settings page shows "Last booking push
+  (ntfy)" with the real result.
 
 = 1.2.4 =
 * Fix: iCloud busy blocks are now created per real LatePoint agent and location

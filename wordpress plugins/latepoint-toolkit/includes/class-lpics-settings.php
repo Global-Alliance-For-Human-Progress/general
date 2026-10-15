@@ -324,6 +324,19 @@ class LPICS_Settings {
 							?>
 						</td>
 					</tr>
+					<tr>
+						<td><strong>Last booking push (ntfy)</strong></td>
+						<td>
+							<?php
+							$last_ntfy = get_option( 'lpics_last_ntfy', array() );
+							if ( ! empty( $last_ntfy['msg'] ) ) {
+								echo esc_html( $last_ntfy['msg'] ) . ' <em>(' . esc_html( human_time_diff( (int) $last_ntfy['time'] ) ) . ' ago)</em>';
+							} else {
+								echo '<em>No booking has triggered a push yet.</em>';
+							}
+							?>
+						</td>
+					</tr>
 				</tbody>
 			</table>
 
