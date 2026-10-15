@@ -3,7 +3,7 @@ Contributors: Liam Bartsch
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.2.1
+Stable tag: 1.2.4
 License: GPLv2 or later
 
 Free LatePoint add-ons as a companion plugin: two-way Apple iCloud Calendar sync
@@ -140,6 +140,20 @@ or run only one. They use separate booking meta keys so they will not corrupt
 each other, but syncing the same booking into two places at once is confusing.
 
 == Changelog ==
+
+= 1.2.4 =
+* Fix: iCloud busy blocks are now created per real LatePoint agent and location
+  instead of agent 0 / location 0, which LatePoint could ignore, so busy times
+  still showed as bookable. The last-check row now lists the blocked agents.
+
+= 1.2.3 =
+* The iCloud Sync settings page now shows the result of the last availability
+  check ("Last availability check"), so busy-time blocking can be diagnosed
+  without enabling WP_DEBUG or editing wp-config.php.
+
+= 1.2.2 =
+* Debug logging for the busy-time blocking path ("[LPICS] inject busy: ..."), to
+  diagnose slots that are still offered while the iCloud calendar is busy.
 
 = 1.2.1 =
 * Settings now live under a top-level "LatePoint Toolkit" sidebar menu (iCloud

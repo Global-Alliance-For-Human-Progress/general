@@ -380,9 +380,11 @@ class LPICS_Sync {
 			return $booked_periods;
 		}
 		if ( ! class_exists( '\LatePoint\Misc\BookedPeriod' ) ) {
+			LPICS_CalDAV_Client::log( 'inject busy skipped: \LatePoint\Misc\BookedPeriod class not found.' );
 			return $booked_periods;
 		}
 		if ( empty( $filter ) || empty( $filter->date_from ) ) {
+			LPICS_CalDAV_Client::log( 'inject busy skipped: filter has no date_from.' );
 			return $booked_periods;
 		}
 
@@ -403,28 +405,74 @@ class LPICS_Sync {
 		$date_to   = ! empty( $filter->date_to ) ? $filter->date_to : $filter->date_from;
 
 		$busy = $this->get_busy_periods( $date_from, $date_to );
+		usort( $busy, function ( $a, $b ) {
+			return array( $a['date'], $a['start_min'] ) <=> array( $b['date'], $b['start_min'] );
+		} );
+		$summary = 'inject busy: filter ' . $date_from . ' to ' . $date_to
+			. ' (agent_id=' . ( is_array( $filter_agent ) ? implode( ',', $filter_agent ) : $filter_agent )
+			. ', blocking agents=' . implode( ',', $this->block_agent_ids( $filter_agent ) )
+			. ') -> ' . count( $busy ) . ' busy segment(s)'
+			. ( $busy ? ', first 6: ' . wp_json_encode( array_slice( $busy, 0, 6 ) ) : '' ) . '.';
+		LPICS_CalDAV_Client::log( $summary );
+		// Also kept in an option so the settings page can show it without WP_DEBUG.
+		update_option( 'lpics_last_inject', array( 'time' => time(), 'msg' => $summary ), false );
 		if ( empty( $busy ) ) {
 			return $booked_periods;
 		}
 
-		$block_agent_id = LPICS_Options::agent_id(); // may be 0
+		// LatePoint matches booked periods against the concrete agent/location it
+		// is checking, so a block tagged agent 0 / location 0 can be ignored.
+		// Emit one block per real agent and location instead.
+		$agent_ids    = $this->block_agent_ids( $filter_agent );
+		$location_ids = $this->table_ids( 'LATEPOINT_TABLE_LOCATIONS' );
+		if ( empty( $location_ids ) ) {
+			$location_ids = array( 0 );
+		}
 		foreach ( $busy as $segment ) {
-			$booked_periods[] = new \LatePoint\Misc\BookedPeriod( array(
-				'start_date'      => $segment['date'],
-				'end_date'        => $segment['date'],
-				'start_time'      => $segment['start_min'],
-				'end_time'        => $segment['end_min'],
-				'agent_id'        => $block_agent_id,
-				// service_id 0 never matches a real service id, so LatePoint's
-				// overlap check treats any overlap as "blocked" (verified in
-				// OsBookingHelper::is_timeframe_in_booked_periods).
-				'service_id'      => 0,
-				'location_id'     => 0,
-				'total_attendees' => 9999,
-			) );
+			foreach ( $agent_ids as $agent_id ) {
+				foreach ( $location_ids as $location_id ) {
+					$booked_periods[] = new \LatePoint\Misc\BookedPeriod( array(
+						'start_date'      => $segment['date'],
+						'end_date'        => $segment['date'],
+						'start_time'      => $segment['start_min'],
+						'end_time'        => $segment['end_min'],
+						'agent_id'        => $agent_id,
+						// service_id 0 never matches a real service id, so LatePoint's
+						// overlap check treats any overlap as "blocked" (verified in
+						// OsBookingHelper::is_timeframe_in_booked_periods).
+						'service_id'      => 0,
+						'location_id'     => $location_id,
+						'total_attendees' => 9999,
+					) );
+				}
+			}
 		}
 
 		return $booked_periods;
+	}
+
+	/** Agent ids a busy block should apply to: the configured agent, else the queried ones, else all. */
+	private function block_agent_ids( $filter_agent ) {
+		$configured = LPICS_Options::agent_id();
+		if ( $configured ) {
+			return array( $configured );
+		}
+		$queried = array_filter( array_map( 'intval', (array) $filter_agent ) );
+		if ( $queried ) {
+			return array_values( $queried );
+		}
+		$all = $this->table_ids( 'LATEPOINT_TABLE_AGENTS' );
+		return $all ? $all : array( 0 );
+	}
+
+	/** Ids from one of LatePoint's tables (named by constant), or an empty array. */
+	private function table_ids( $table_constant ) {
+		global $wpdb;
+		if ( ! defined( $table_constant ) ) {
+			return array();
+		}
+		$ids = $wpdb->get_col( 'SELECT id FROM ' . constant( $table_constant ) );
+		return array_map( 'intval', (array) $ids );
 	}
 
 	/**

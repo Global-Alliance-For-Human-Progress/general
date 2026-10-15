@@ -311,6 +311,19 @@ class LPICS_Settings {
 						<td><strong>Block busy</strong> (iCloud &rarr; availability)</td>
 						<td><?php echo $block_busy ? 'On' : 'Off'; ?></td>
 					</tr>
+					<tr>
+						<td><strong>Last availability check</strong></td>
+						<td>
+							<?php
+							$last_check = get_option( 'lpics_last_inject', array() );
+							if ( ! empty( $last_check['msg'] ) ) {
+								echo esc_html( $last_check['msg'] ) . ' <em>(' . esc_html( human_time_diff( (int) $last_check['time'] ) ) . ' ago)</em>';
+							} else {
+								echo '<em>LatePoint has not asked for availability since the plugin loaded. Open the booking form and pick a date, then reload this page.</em>';
+							}
+							?>
+						</td>
+					</tr>
 				</tbody>
 			</table>
 
