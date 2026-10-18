@@ -88,8 +88,9 @@ class LPSP_Methods {
 	public function add_all_methods( $payment_times ) {
 		$later = defined( 'LATEPOINT_PAYMENT_TIME_LATER' ) ? LATEPOINT_PAYMENT_TIME_LATER : 'later';
 		$now   = defined( 'LATEPOINT_PAYMENT_TIME_NOW' ) ? LATEPOINT_PAYMENT_TIME_NOW : 'now';
-		$payment_times[ $later ][ self::METHOD_QR ][ self::PROCESSOR ]      = $this->method_info( self::METHOD_QR );
-		$payment_times[ $later ][ self::METHOD_TWINT ][ self::PROCESSOR ]   = $this->method_info( self::METHOD_TWINT );
+		// QR-bill and manual TWINT are pay-later methods, disabled so a booking is never confirmed before payment.
+		// $payment_times[ $later ][ self::METHOD_QR ][ self::PROCESSOR ]      = $this->method_info( self::METHOD_QR );
+		// $payment_times[ $later ][ self::METHOD_TWINT ][ self::PROCESSOR ]   = $this->method_info( self::METHOD_TWINT );
 		$payment_times[ $now ][ self::METHOD_VOUCHER ][ self::PROCESSOR ]   = $this->method_info( self::METHOD_VOUCHER );
 		return $payment_times;
 	}
@@ -98,12 +99,13 @@ class LPSP_Methods {
 		$later = defined( 'LATEPOINT_PAYMENT_TIME_LATER' ) ? LATEPOINT_PAYMENT_TIME_LATER : 'later';
 		$now   = defined( 'LATEPOINT_PAYMENT_TIME_NOW' ) ? LATEPOINT_PAYMENT_TIME_NOW : 'now';
 
-		if ( self::qr_enabled() ) {
-			$payment_times[ $later ][ self::METHOD_QR ][ self::PROCESSOR ] = $this->method_info( self::METHOD_QR );
-		}
-		if ( self::twint_enabled() ) {
-			$payment_times[ $later ][ self::METHOD_TWINT ][ self::PROCESSOR ] = $this->method_info( self::METHOD_TWINT );
-		}
+		// Pay-later methods disabled (see add_all_methods). Re-enable by uncommenting.
+		// if ( self::qr_enabled() ) {
+		// 	$payment_times[ $later ][ self::METHOD_QR ][ self::PROCESSOR ] = $this->method_info( self::METHOD_QR );
+		// }
+		// if ( self::twint_enabled() ) {
+		// 	$payment_times[ $later ][ self::METHOD_TWINT ][ self::PROCESSOR ] = $this->method_info( self::METHOD_TWINT );
+		// }
 		if ( LPSP_Options::is_on( 'voucher_enabled' ) ) {
 			$payment_times[ $now ][ self::METHOD_VOUCHER ][ self::PROCESSOR ] = $this->method_info( self::METHOD_VOUCHER );
 		}

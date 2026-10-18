@@ -2,7 +2,7 @@
 /**
  * Plugin Name: LatePoint Toolkit (iCloud Sync, Swiss Payments)
  * Description: Free LatePoint add-ons. Two-way Apple iCloud Calendar sync over CalDAV with ntfy alerts, plus fee-free Swiss payment options: QR-bill bank transfer, manual TWINT and prepaid voucher codes. Companion plugin, LatePoint must be active.
- * Version: 1.2.5
+ * Version: 1.3.0
  * Author: Liam Bartsch
  * License: GPL-2.0-or-later
  * Requires PHP: 7.4
@@ -46,7 +46,7 @@ if ( defined( 'LPICS_VERSION' ) ) {
 	return;
 }
 
-define( 'LPICS_VERSION', '1.2.5' );
+define( 'LPICS_VERSION', '1.3.0' );
 define( 'LPICS_FILE', __FILE__ );
 define( 'LPICS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LPICS_SETTINGS_SLUG', 'lpics-settings' );
