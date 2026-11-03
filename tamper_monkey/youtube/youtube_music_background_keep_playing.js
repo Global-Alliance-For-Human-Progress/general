@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         YouTube Music Background Playback Fixer
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.03.1
-// @description  Keeps YouTube Music playing in background tabs: resumes after track-change stalls, advances when the queue stops after a song, dismisses idle prompts
+// @version      2026.11.03.2
+// @description  Keeps YouTube Music playing in background tabs: keeps the tab awake between tracks, resumes after track-change stalls, advances when the queue stops after a song, dismisses idle prompts
 // @author       You
 // @match        https://music.youtube.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=music.youtube.com
@@ -105,6 +105,31 @@
         return false;
     }
 
+    // Keep the tab counted as "playing audio" between tracks. When a track ends the audio stops,
+    // and a background tab that is silent for a while gets frozen by the browser (no timers, no
+    // events) until the user visits it. A near-inaudible tone keeps it active.
+    const KEEP_AWAKE_TONE = true;
+    let toneCtx = null;
+    function keepAwake() {
+        if (!KEEP_AWAKE_TONE) return;
+        try {
+            if (!toneCtx) {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                toneCtx = new AC();
+                const osc = toneCtx.createOscillator();
+                const gain = toneCtx.createGain();
+                osc.frequency.value = 30;
+                gain.gain.value = 0.002;
+                osc.connect(gain);
+                gain.connect(toneCtx.destination);
+                osc.start();
+                log('keep-awake tone started, state =', toneCtx.state);
+            }
+            if (toneCtx.state === 'suspended') toneCtx.resume();
+        } catch (e) { log('keep-awake tone failed', String(e)); }
+    }
+    ['playing', 'click', 'keydown'].forEach(t => document.addEventListener(t, keepAwake, true));
+
     // 4. Resume when the player pauses or stops without the user asking for it
     let lastEndedSrc = null;
 
@@ -170,7 +195,7 @@
     setInterval(() => resumeIfStalled('timer'), 3000);
 
     // Heartbeat so the log shows the tab was alive (and not frozen) between events
-    setInterval(() => log('heartbeat', vstate(getVideo())), 15000);
+    setInterval(() => log('heartbeat', vstate(getVideo()), 'tone=' + (toneCtx ? toneCtx.state : 'none')), 15000);
 
     log('loaded');
 })();
