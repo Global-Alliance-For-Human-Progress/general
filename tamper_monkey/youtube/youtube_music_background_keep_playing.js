@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         YouTube Music Background Playback Fixer
 // @namespace    http://tampermonkey.net/
-// @version      2026.10.30
-// @description  Keeps YouTube Music playing in background tabs: resumes after track-change stalls, dismisses idle prompts
+// @version      2026.11.03
+// @description  Keeps YouTube Music playing in background tabs: resumes after track-change stalls, advances when the queue stops after a song, dismisses idle prompts
 // @author       You
 // @match        https://music.youtube.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=music.youtube.com
@@ -12,6 +12,10 @@
 
 (function () {
     'use strict';
+
+    // Open DevTools console on music.youtube.com and filter by "[YTM-fix]" to see what the script does
+    const DEBUG = true;
+    const log = (...a) => { if (DEBUG) console.log('[YTM-fix]', ...a); };
 
     // 1. Make the page believe it is always visible and focused
     try {
@@ -27,22 +31,41 @@
         document.addEventListener(type, e => e.stopImmediatePropagation(), true);
     });
 
-    // 2. Track user intent so a deliberate pause is never overridden
-    let userPausedAt = 0;
-    const markUserPause = () => { userPausedAt = Date.now(); };
+    // 2. Track user intent: once the user pauses, stay paused until they play or change track
+    let userPaused = false;
+    const PLAYPAUSE_SEL = '#play-pause-button, .play-pause-button';
+    const NEXT_SEL = '.next-button, ytmusic-player-bar [aria-label="Next"], [aria-label="Next song"], tp-yt-paper-icon-button.next-button';
+
+    const getVideo = () => document.querySelector('video');
 
     document.addEventListener('click', e => {
-        if (e.target.closest && e.target.closest('#play-pause-button, .play-pause-button')) markUserPause();
+        const t = e.target;
+        if (!t || !t.closest) return;
+        if (t.closest(PLAYPAUSE_SEL)) {
+            const v = getVideo();
+            // Clicking while playing means the user pauses; clicking while paused means they resume
+            userPaused = !!(v && !v.paused);
+            log('user click play/pause, userPaused =', userPaused);
+        } else if (t.closest(NEXT_SEL) || t.closest('.previous-button')) {
+            userPaused = false;
+        }
     }, true);
     document.addEventListener('keydown', e => {
-        if ((e.key === ' ' || e.key === 'k') && !/INPUT|TEXTAREA/.test(e.target.tagName)) markUserPause();
+        if ((e.key === ' ' || e.key === 'k') && !/INPUT|TEXTAREA/.test(e.target.tagName)) {
+            const v = getVideo();
+            userPaused = !!(v && !v.paused);
+            log('user key play/pause, userPaused =', userPaused);
+        }
     }, true);
     try {
-        // Media keys / OS media controls go through the Media Session pause action
+        // Media keys / OS media controls go through the Media Session actions
         const origSet = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
         navigator.mediaSession.setActionHandler = (action, handler) => {
-            if (action === 'pause' && handler) {
-                return origSet(action, (...args) => { markUserPause(); return handler(...args); });
+            if (handler && action === 'pause') {
+                return origSet(action, (...args) => { userPaused = true; log('media key pause'); return handler(...args); });
+            }
+            if (handler && (action === 'play' || action === 'nexttrack' || action === 'previoustrack')) {
+                return origSet(action, (...args) => { userPaused = false; return handler(...args); });
             }
             return origSet(action, handler);
         };
@@ -52,69 +75,66 @@
     setInterval(() => { window._lact = Date.now(); }, 30000);
 
     function dismissPrompt() {
-        const btn = document.querySelector(
-            'ytmusic-you-there-renderer #button, ytmusic-you-there-renderer paper-button, ' +
-            'yt-confirm-dialog-renderer #confirm-button, tp-yt-paper-dialog #confirm-button'
-        );
+        const dialog = document.querySelector('ytmusic-you-there-renderer');
+        if (!dialog) return false;
+        const btn = dialog.querySelector('button, #button, paper-button, yt-button-renderer');
         if (btn && btn.offsetWidth > 0) {
+            log('dismissing idle prompt');
             btn.click();
             return true;
         }
         return false;
     }
 
-    // 4. Resume when the player stalls or pauses without the user asking for it
-    let transitionUntil = 0;
+    // 4. Resume when the player pauses or stops without the user asking for it
+    let lastEndedSrc = null;
 
-    function resumeIfStalled() {
-        const video = document.querySelector('video');
+    function resumeIfStalled(reason) {
+        const video = getVideo();
         if (!video) return;
         if (dismissPrompt()) return;
+        if (userPaused) return;
 
-        const recentUserPause = Date.now() - userPausedAt < 15000;
-        if (recentUserPause) return;
+        if (video.ended) {
+            // YouTube Music normally advances by itself; only step in if it did not
+            const src = video.currentSrc || video.src;
+            if (lastEndedSrc === src) return;
+            lastEndedSrc = src;
+            setTimeout(() => {
+                const v = getVideo();
+                if (!v || userPaused || !v.ended) return;
+                const next = document.querySelector(NEXT_SEL);
+                log('track ended and player did not advance, clicking next', !!next);
+                if (next) next.click();
+            }, 2000);
+            return;
+        }
 
-        const nearEnd = video.duration && (video.duration - video.currentTime < 1.5);
-        const inTransition = Date.now() < transitionUntil;
-
-        if (video.ended || (video.paused && (nearEnd || inTransition))) {
-            const next = document.querySelector('.next-button, ytmusic-player-bar [aria-label="Next"], [aria-label="Next song"]');
-            if (video.ended && next) {
-                next.click();
-            } else {
-                video.play().catch(() => {
-                    // Autoplay was refused: poke the player bar button instead
-                    const pp = document.querySelector('#play-pause-button');
-                    if (pp && video.paused) pp.click();
-                });
-            }
+        if (video.paused) {
+            log('paused without user intent (' + reason + '), playing');
+            video.play().catch(() => {
+                // Autoplay was refused: click the player bar button instead
+                const pp = document.querySelector('#play-pause-button');
+                if (pp && video.paused) pp.click();
+            });
         }
     }
 
-    function attachMediaWatchdog(video) {
-        if (video.dataset.watchdogAttached) return;
-        video.dataset.watchdogAttached = 'true';
-
-        // A new track is loading: if it pauses itself during this window, resume it
-        ['loadstart', 'emptied', 'ended'].forEach(t => {
-            video.addEventListener('' + t, () => { transitionUntil = Date.now() + 10000; }, { passive: true });
-        });
-        ['ended', 'pause', 'stalled', 'waiting', 'suspend'].forEach(t => {
-            video.addEventListener(t, () => setTimeout(resumeIfStalled, 500), { passive: true });
-        });
-    }
-
-    const observer = new MutationObserver(() => {
-        const video = document.querySelector('video');
-        if (video) attachMediaWatchdog(video);
+    // Media events do not bubble, but capture-phase listeners on document still see them,
+    // and keep working if YouTube Music replaces the <video> element
+    ['ended', 'pause', 'stalled', 'waiting', 'suspend', 'emptied'].forEach(t => {
+        document.addEventListener(t, e => {
+            if (!(e.target instanceof HTMLVideoElement)) return;
+            log('video event:', t);
+            setTimeout(() => resumeIfStalled(t), 1000);
+        }, true);
     });
-
-    document.addEventListener('DOMContentLoaded', () => {
-        observer.observe(document.body, { childList: true, subtree: true });
-        const video = document.querySelector('video');
-        if (video) attachMediaWatchdog(video);
-    });
+    document.addEventListener('loadstart', e => {
+        if (e.target instanceof HTMLVideoElement) { lastEndedSrc = null; log('new track loading'); }
+    }, true);
 
     // Backup loop in case an event is missed
-    setInterval(resumeIfStalled, 3000);
+    setInterval(() => resumeIfStalled('timer'), 3000);
+
+    log('loaded');
 })();
