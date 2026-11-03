@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Music Background Playback Fixer
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.03
+// @version      2026.11.03.1
 // @description  Keeps YouTube Music playing in background tabs: resumes after track-change stalls, advances when the queue stops after a song, dismisses idle prompts
 // @author       You
 // @match        https://music.youtube.com/*
@@ -108,6 +108,19 @@
     // 4. Resume when the player pauses or stops without the user asking for it
     let lastEndedSrc = null;
 
+    // Background tabs that stop playing audio get their timers throttled to about once a minute,
+    // which stalls both this script and YouTube Music's own next-track logic. MessageChannel
+    // ticks are not throttled, so use them instead of setTimeout for the time-critical waits
+    const sleep = ms => new Promise(resolve => {
+        const end = performance.now() + ms;
+        const ch = new MessageChannel();
+        ch.port1.onmessage = () => {
+            if (performance.now() >= end) { ch.port1.close(); resolve(); }
+            else ch.port2.postMessage(0);
+        };
+        ch.port2.postMessage(0);
+    });
+
     function resumeIfStalled(reason) {
         const video = getVideo();
         if (!video) return;
@@ -119,13 +132,14 @@
             const src = video.currentSrc || video.src;
             if (lastEndedSrc === src) return;
             lastEndedSrc = src;
-            setTimeout(() => {
+            log('track ended, waiting for the player to advance');
+            sleep(2000).then(() => {
                 const v = getVideo();
-                if (!v || userPaused || !v.ended) return;
+                if (!v || userPaused || !v.ended) { log('player advanced on its own or user paused'); return; }
                 const next = document.querySelector(NEXT_SEL);
                 log('track ended and player did not advance, clicking next', !!next);
                 if (next) next.click();
-            }, 2000);
+            });
             return;
         }
 
@@ -145,7 +159,7 @@
         document.addEventListener(t, e => {
             if (!e.target || e.target.tagName !== 'VIDEO') return;
             log('video event:', t, vstate(e.target));
-            setTimeout(() => resumeIfStalled(t), 1000);
+            sleep(1000).then(() => resumeIfStalled(t));
         }, true);
     });
     document.addEventListener('loadstart', e => {
