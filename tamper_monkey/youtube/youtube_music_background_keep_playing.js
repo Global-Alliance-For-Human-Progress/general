@@ -6,16 +6,34 @@
 // @author       You
 // @match        https://music.youtube.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=music.youtube.com
-// @grant        none
+// @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
+// @connect      localhost
+// @connect      127.0.0.1
 // @run-at       document-start
 // ==/UserScript==
 
 (function () {
     'use strict';
 
-    // Open DevTools console on music.youtube.com and filter by "[YTM-fix]" to see what the script does
+    // Logs go to the DevTools console (filter by "[YTM-fix]") and, if the listener
+    // (ytm_log_listener.ps1) is running, to ytm-fix.log next to this script
     const DEBUG = true;
-    const log = (...a) => { if (DEBUG) console.log('[YTM-fix]', ...a); };
+    const LOG_URL = 'http://localhost:8765/';
+    const log = (...a) => {
+        if (!DEBUG) return;
+        console.log('[YTM-fix]', ...a);
+        try {
+            GM_xmlhttpRequest({
+                method: 'POST',
+                url: LOG_URL,
+                data: a.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' '),
+                onerror: () => {},
+            });
+        } catch (e) {}
+    };
+    const vstate = v => v ? 't=' + v.currentTime.toFixed(1) + '/' + (v.duration || 0).toFixed(1) +
+        ' paused=' + v.paused + ' ended=' + v.ended + ' ready=' + v.readyState + ' hidden=' + document.hidden : 'no video';
 
     // 1. Make the page believe it is always visible and focused
     try {
@@ -59,8 +77,9 @@
     }, true);
     try {
         // Media keys / OS media controls go through the Media Session actions
-        const origSet = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
-        navigator.mediaSession.setActionHandler = (action, handler) => {
+        const ms = unsafeWindow.navigator.mediaSession;
+        const origSet = ms.setActionHandler.bind(ms);
+        ms.setActionHandler = (action, handler) => {
             if (handler && action === 'pause') {
                 return origSet(action, (...args) => { userPaused = true; log('media key pause'); return handler(...args); });
             }
@@ -72,7 +91,7 @@
     } catch (e) {}
 
     // 3. Prevent the "Are you still listening?" idle timeout by faking user activity
-    setInterval(() => { window._lact = Date.now(); }, 30000);
+    setInterval(() => { unsafeWindow._lact = Date.now(); }, 30000);
 
     function dismissPrompt() {
         const dialog = document.querySelector('ytmusic-you-there-renderer');
@@ -124,17 +143,20 @@
     // and keep working if YouTube Music replaces the <video> element
     ['ended', 'pause', 'stalled', 'waiting', 'suspend', 'emptied'].forEach(t => {
         document.addEventListener(t, e => {
-            if (!(e.target instanceof HTMLVideoElement)) return;
-            log('video event:', t);
+            if (!e.target || e.target.tagName !== 'VIDEO') return;
+            log('video event:', t, vstate(e.target));
             setTimeout(() => resumeIfStalled(t), 1000);
         }, true);
     });
     document.addEventListener('loadstart', e => {
-        if (e.target instanceof HTMLVideoElement) { lastEndedSrc = null; log('new track loading'); }
+        if (e.target && e.target.tagName === 'VIDEO') { lastEndedSrc = null; log('new track loading', vstate(e.target)); }
     }, true);
 
     // Backup loop in case an event is missed
     setInterval(() => resumeIfStalled('timer'), 3000);
+
+    // Heartbeat so the log shows the tab was alive (and not frozen) between events
+    setInterval(() => log('heartbeat', vstate(getVideo())), 15000);
 
     log('loaded');
 })();
