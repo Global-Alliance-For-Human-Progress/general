@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Music Background Playback Fixer
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.03.2
+// @version      2026.11.04
 // @description  Keeps YouTube Music playing in background tabs: keeps the tab awake between tracks, resumes after track-change stalls, advances when the queue stops after a song, dismisses idle prompts
 // @author       You
 // @match        https://music.youtube.com/*
@@ -18,7 +18,7 @@
 
     // Logs go to the DevTools console (filter by "[YTM-fix]") and, if the listener
     // (ytm_log_listener.ps1) is running, to ytm-fix.log next to this script
-    const DEBUG = true;
+    const DEBUG = false;
     const LOG_URL = 'http://localhost:8765/';
     const log = (...a) => {
         if (!DEBUG) return;

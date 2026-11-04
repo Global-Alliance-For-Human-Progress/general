@@ -1,15 +1,31 @@
 // ==UserScript==
-// @name         Joya Portal Auto Sign in with Joya
+// @name         Joya Portal Helper
 // @namespace    https://portal-test.joya.ch/
-// @version      2026.10.14.1
-// @description  Auto-clicks the "Sign in with Joya" button on the Joya portal login page
-// @match        https://portal-test.joya.ch/*/login*
-// @match        https://portal.joya.ch/*/login*
+// @version      2026.11.04.1
+// @description  On every Joya portal page: switches the /de/ URL to /en/. On the login page: auto-clicks the "Sign in with Joya" button
+// @match        https://portal-test.joya.ch/*
+// @match        https://portal.joya.ch/*
 // @grant        none
+// @run-at       document-start
 // ==/UserScript==
 
 (function () {
   'use strict';
+
+  // Switch the German locale to English before anything else, on every portal page;
+  // replace() keeps the German URL out of the back history, and the English page
+  // reruns this script
+  if (/^\/de(\/|$)/.test(location.pathname)) {
+    location.replace(
+      location.pathname.replace(/^\/de(?=\/|$)/, '/en') + location.search + location.hash
+    );
+    return;
+  }
+
+  // The auto-click only applies to the login page
+  if (!/^\/[a-z]{2}\/login(\/|$)/.test(location.pathname)) {
+    return;
+  }
 
   function findJoyaButton() {
     const buttons = document.querySelectorAll('button[data-slot="button"]');
