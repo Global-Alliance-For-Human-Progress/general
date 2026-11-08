@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Music Background Playback Fixer
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.04
+// @version      2026.11.04.1
 // @description  Keeps YouTube Music playing in background tabs: keeps the tab awake between tracks, resumes after track-change stalls, advances when the queue stops after a song, dismisses idle prompts
 // @author       You
 // @match        https://music.youtube.com/*
@@ -180,15 +180,31 @@
 
     // Media events do not bubble, but capture-phase listeners on document still see them,
     // and keep working if YouTube Music replaces the <video> element
+    // Any pause that is not part of a track change or the track ending is the user's doing,
+    // whichever control (player bar, video click, media key, other tab) triggered it
+    let lastTrackChange = 0;
     ['ended', 'pause', 'stalled', 'waiting', 'suspend', 'emptied'].forEach(t => {
         document.addEventListener(t, e => {
-            if (!e.target || e.target.tagName !== 'VIDEO') return;
-            log('video event:', t, vstate(e.target));
+            const v = e.target;
+            if (!v || v.tagName !== 'VIDEO') return;
+            log('video event:', t, vstate(v));
+            if (t === 'ended' || t === 'emptied') lastTrackChange = Date.now();
+            if (t === 'pause') {
+                const nearEnd = v.duration && v.duration - v.currentTime < 1.5;
+                const changing = Date.now() - lastTrackChange < 3000;
+                if (!v.ended && !v.seeking && !nearEnd && !changing) {
+                    userPaused = true;
+                    log('pause treated as user pause');
+                }
+            }
             sleep(1000).then(() => resumeIfStalled(t));
         }, true);
     });
+    document.addEventListener('playing', e => {
+        if (e.target && e.target.tagName === 'VIDEO') userPaused = false;
+    }, true);
     document.addEventListener('loadstart', e => {
-        if (e.target && e.target.tagName === 'VIDEO') { lastEndedSrc = null; log('new track loading', vstate(e.target)); }
+        if (e.target && e.target.tagName === 'VIDEO') { lastEndedSrc = null; lastTrackChange = Date.now(); log('new track loading', vstate(e.target)); }
     }, true);
 
     // Backup loop in case an event is missed
