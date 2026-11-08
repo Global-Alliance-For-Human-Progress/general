@@ -27,6 +27,7 @@ Browser userscripts for enhanced productivity, grouped into one folder per appli
 - **reddit/** - Modmail turbo scroll
 - **render/** - Billing usage tracker with dynamic colors
 - **rexx/** - Translates the French rexx portal into near-native English
+- **swisscom/** - Mobile data usage tracker with ideal-pace bar and dynamic colors
 - **turso/** - Database usage percentage badges
 
 ## PowerShell Windows
