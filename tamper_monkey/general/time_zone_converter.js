@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Time Zone Converter
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.13.1
+// @version      2026.11.13.2
 // @description  Finds times written with a time zone (e.g. "12:00 PM UTC", "11:04:50 AM EST", "09:30 UTC+2") on any page and rewrites them into your preferred time zone and format, so everyone sees time the way that suits them.
 // @author       You
 // @match        *://*/*
@@ -159,16 +159,25 @@
         observer.observe(root, { childList: true, subtree: true, characterData: true });
     }
 
-    // Collects text nodes, descending into open shadow roots (many web-component
-    // apps, e.g. Microsoft admin portals, render their text inside them).
+    // Collects text nodes, descending into open shadow roots and into same-origin
+    // iframes (many apps, e.g. Microsoft status pages, render their text inside
+    // script-filled blank iframes, which userscripts are not injected into).
     function collect(root, out) {
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+        const doc = root.ownerDocument || root;
+        const walker = doc.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
         while (walker.nextNode()) {
             const n = walker.currentNode;
             if (n.nodeType === Node.TEXT_NODE) out.push(n);
             else if (n.shadowRoot) {
                 observe(n.shadowRoot);
                 collect(n.shadowRoot, out);
+            } else if (n.tagName === 'IFRAME') {
+                let inner = null;
+                try { inner = n.contentDocument; } catch (e) { /* cross-origin */ }
+                if (inner && inner.documentElement) {
+                    observe(inner.documentElement);
+                    collect(inner.documentElement, out);
+                }
             }
         }
     }
