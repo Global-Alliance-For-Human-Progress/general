@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         TikTok Disable Photo Carousel Autoplay + Image & Video Downloader
+// @name         Disable Photo Carousel Autoplay + Image & Video Downloader
 // @namespace    tiktok-no-autoplay
-// @version      2026.11.01
+// @version      2026.11.13
 // @description  Disables TikTok photo auto-scrolling and provides reliable GM_download buttons for slide images and videos
 // @match        https://www.tiktok.com/*
 // @grant        GM_download
@@ -106,7 +106,51 @@
     }
   }
 
-  function getActiveVideoUrl() {
+  function getVideoId(v) {
+    const m = location.pathname.match(/\/video\/(\d+)/);
+    if (m) return m[1];
+    // Feed / profile: look for a permalink near the playing video
+    let el = v;
+    for (let i = 0; el && i < 12; i++, el = el.parentElement) {
+      const a = el.querySelector && el.querySelector('a[href*="/video/"]');
+      if (a) {
+        const mm = a.getAttribute('href').match(/\/video\/(\d+)/);
+        if (mm) return mm[1];
+      }
+    }
+    return null;
+  }
+
+  function extractVideoUrlFromHtml(html, id) {
+    const m = html.match(/<script[^>]*id="__UNIVERSAL_DATA_FOR_REHYDRATION__"[^>]*>([\s\S]*?)<\/script>/);
+    if (!m) return null;
+    try {
+      const data = JSON.parse(m[1]);
+      const item = data.__DEFAULT_SCOPE__['webapp.video-detail'].itemInfo.itemStruct;
+      if (id && item.id !== id) return null;
+      const vid = item.video;
+      return vid.downloadAddr || vid.playAddr ||
+        (vid.bitrateInfo && vid.bitrateInfo[0] && vid.bitrateInfo[0].PlayAddr && vid.bitrateInfo[0].PlayAddr.UrlList[0]) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Fetch the video's own page (with the user's cookies) and read its embedded data
+  function fetchVideoUrlById(id) {
+    return new Promise(resolve => {
+      GM_xmlhttpRequest({
+        method: 'GET',
+        url: `https://www.tiktok.com/@_/video/${id}`,
+        headers: { Referer: 'https://www.tiktok.com/' },
+        onload: res => resolve(extractVideoUrlFromHtml(res.responseText || '', id)),
+        onerror: () => resolve(null),
+        ontimeout: () => resolve(null)
+      });
+    });
+  }
+
+  async function getActiveVideoUrl() {
     const v = getVisibleVideo();
     if (v) {
       const direct = [v.currentSrc, v.src].find(u => u && u.startsWith('http'));
@@ -114,8 +158,11 @@
       const source = Array.from(v.querySelectorAll('source')).find(x => x.src && x.src.startsWith('http'));
       if (source) return source.src;
     }
-    // blob: sources can't be downloaded, fall back to the page's embedded data
-    return getRehydrationVideoUrl();
+    // blob: sources can't be downloaded. Try the page's embedded data, then fetch by video id
+    const embedded = getRehydrationVideoUrl();
+    if (embedded) return embedded;
+    const id = getVideoId(v);
+    return id ? await fetchVideoUrlById(id) : null;
   }
 
   // 5. Download Execution via Tampermonkey GM privileges
@@ -178,15 +225,16 @@
     downloadUrl(btn, imgUrl, `tiktok_photo_${Date.now()}.jpeg`, IMAGE_LABEL);
   }
 
-  function handleVideoDownload(btn) {
-    const videoUrl = getActiveVideoUrl();
+  async function handleVideoDownload(btn) {
+    btn.innerText = '⏳ Looking up...';
+    const videoUrl = await getActiveVideoUrl();
     if (!videoUrl) {
       btn.innerText = '❌ No Video Found';
       setTimeout(() => { btn.innerText = VIDEO_LABEL; }, 1500);
       return;
     }
-    const idMatch = location.pathname.match(/\/video\/(\d+)/);
-    downloadUrl(btn, videoUrl, `tiktok_video_${idMatch ? idMatch[1] : Date.now()}.mp4`, VIDEO_LABEL);
+    const id = getVideoId(getVisibleVideo());
+    downloadUrl(btn, videoUrl, `tiktok_video_${id || Date.now()}.mp4`, VIDEO_LABEL);
   }
 
   // 6. Create Standalone Floating Overlay Buttons
