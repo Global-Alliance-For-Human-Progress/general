@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Time Zone Converter
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.13
+// @version      2026.11.13.1
 // @description  Finds times written with a time zone (e.g. "12:00 PM UTC", "11:04:50 AM EST", "09:30 UTC+2") on any page and rewrites them into your preferred time zone and format, so everyone sees time the way that suits them.
 // @author       You
 // @match        *://*/*
@@ -130,8 +130,11 @@
     const done = new WeakMap(); // text node -> the value we last wrote, to avoid loops
 
     function skipNode(node) {
-        for (let el = node.parentElement; el; el = el.parentElement) {
+        let el = node.parentElement;
+        while (el) {
             if (SKIP.has(el.tagName) || el.isContentEditable) return true;
+            // Climb out of shadow roots to the host element.
+            el = el.parentElement || (el.getRootNode() && el.getRootNode().host) || null;
         }
         return false;
     }
@@ -149,12 +152,36 @@
         }
     }
 
+    const observed = new WeakSet();
+    function observe(root) {
+        if (observed.has(root)) return;
+        observed.add(root);
+        observer.observe(root, { childList: true, subtree: true, characterData: true });
+    }
+
+    // Collects text nodes, descending into open shadow roots (many web-component
+    // apps, e.g. Microsoft admin portals, render their text inside them).
+    function collect(root, out) {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+            const n = walker.currentNode;
+            if (n.nodeType === Node.TEXT_NODE) out.push(n);
+            else if (n.shadowRoot) {
+                observe(n.shadowRoot);
+                collect(n.shadowRoot, out);
+            }
+        }
+    }
+
     function processTree(root) {
         if (root.nodeType === Node.TEXT_NODE) return processText(root);
         if (root.nodeType !== Node.ELEMENT_NODE) return;
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
         const nodes = [];
-        while (walker.nextNode()) nodes.push(walker.currentNode);
+        if (root.shadowRoot) {
+            observe(root.shadowRoot);
+            collect(root.shadowRoot, nodes);
+        }
+        collect(root, nodes);
         nodes.forEach(processText);
     }
 
@@ -174,14 +201,21 @@
         }
     }
 
-    new MutationObserver((records) => {
+    const observer = new MutationObserver((records) => {
         for (const r of records) {
             if (r.type === 'characterData') queue(r.target);
             else r.addedNodes.forEach(queue);
         }
-    }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+    });
+    observe(document.documentElement);
 
     processTree(document.body || document.documentElement);
+
+    // Shadow roots attached after our scan raise no mutation on the page, so
+    // rescan occasionally to pick them up.
+    setInterval(() => {
+        if (!document.hidden) processTree(document.body || document.documentElement);
+    }, 3000);
 
     // ---------------------------------------------------------------------
     // Menu commands (top frame only, so they appear once)
