@@ -1,19 +1,62 @@
 // ==UserScript==
-// @name         Cineby: Subtitle Fullscreen Fix
+// @name         Cineby: Subtitle Fullscreen Fix + Popup Blocker
 // @namespace    http://tampermonkey.net/
-// @version      2026.10.17.1
-// @description  Keeps subtitles visible in fullscreen on cineby.xyz (the embedded player otherwise hides them once its controls auto-hide)
+// @version      2026.11.14
+// @description  Keeps subtitles visible in fullscreen on cineby.xyz and blocks ad popups / new tabs opened by clicks (e.g. on pause)
 // @author       Liam
 // @match        https://cineby.xyz/*
 // @match        https://*.cineby.xyz/*
 // @match        https://*/embed/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=cineby.xyz
 // @grant        none
-// @run-at       document-idle
+// @run-at       document-start
 // ==/UserScript==
 
 (function () {
     'use strict';
+
+    // ---- Popup / new tab blocker ----
+    // Runs at document-start in every frame (the player iframe included) so the overrides
+    // are in place before the page's ad code. Ads open tabs via window.open, via
+    // <a target="_blank"> clicks, via synthetic anchor.click(), or via forms with a blank target.
+    const isBlankTarget = t => {
+        const v = (t || '').toLowerCase();
+        return v !== '' && v !== '_self' && v !== '_top' && v !== '_parent';
+    };
+
+    window.open = function () {
+        console.log('[cineby popup blocker] blocked window.open', arguments[0]);
+        return null;
+    };
+
+    const origAnchorClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () {
+        if (isBlankTarget(this.target)) {
+            console.log('[cineby popup blocker] blocked anchor.click', this.href);
+            return;
+        }
+        return origAnchorClick.apply(this, arguments);
+    };
+
+    const origSubmit = HTMLFormElement.prototype.submit;
+    HTMLFormElement.prototype.submit = function () {
+        if (isBlankTarget(this.target)) {
+            console.log('[cineby popup blocker] blocked form.submit', this.action);
+            return;
+        }
+        return origSubmit.apply(this, arguments);
+    };
+
+    // user-clicked links that would open a new tab (capture phase, before the page's handlers)
+    document.addEventListener('click', e => {
+        if (!e.isTrusted) return;
+        const a = e.target && e.target.closest && e.target.closest('a[target]');
+        if (a && isBlankTarget(a.target)) {
+            console.log('[cineby popup blocker] blocked link', a.href);
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        }
+    }, true);
 
     // The actual player lives in a cross-origin iframe (vidsrc style embed, domain rotates),
     // so this script has to run inside that frame. It only does anything if the frame
