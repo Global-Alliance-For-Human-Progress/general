@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Instagram Auto Unmute, Background Play & Image Downloader
 // @namespace    http://tampermonkey.net/
-// @version      2026.09.08.1
+// @version      2026.11.14
 // @description  Autoplay on page load, force unmute, allow background play, and download current image/reel poster
 // @author       Liam
 // @match        https://www.instagram.com/*
@@ -9,6 +9,10 @@
 // @grant        GM_download
 // @grant        GM_xmlhttpRequest
 // @run-at       document-start
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/instagram
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/instagram/instagram_helper.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/instagram/instagram_helper.user.js
 // ==/UserScript==
 
 (function () {

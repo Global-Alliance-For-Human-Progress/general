@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         Jira Team Workload Height Fixer
 // @namespace    http://tampermonkey.net/
-// @version      2026.05.21
+// @version      2026.11.14
 // @description  Forces height to auto on Team Workload gadget
 // @author       Gemini
 // @match        *://*.atlassian.net/*
 // @grant        GM_addStyle
 // @run-at       document-start
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/jira
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/jira/jira_show_full_work_team_no_scroll.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/jira/jira_show_full_work_team_no_scroll.user.js
 // ==/UserScript==
 
 (function() {

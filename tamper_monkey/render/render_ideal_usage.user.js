@@ -1,13 +1,17 @@
 // ==UserScript==
 // @name         Render Billing Usage Tracker - Dynamic Colors
 // @namespace    http://tampermonkey.net/
-// @version      2026.08.27
+// @version      2026.11.14
 // @description  Adds a dynamic target burn-rate progress bar matching Render's header/metrics layout
 // @author       You
 // @match        https://dashboard.render.com/w/*/billing
 // @match        https://dashboard.render.com/billing
 // @grant        none
 // @run-at       document-idle
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/render
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/render/render_ideal_usage.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/render/render_ideal_usage.user.js
 // ==/UserScript==
 
 (function() {

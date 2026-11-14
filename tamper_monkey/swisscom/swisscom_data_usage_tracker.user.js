@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         Swisscom Data Usage Tracker - Dynamic Colors
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.08
+// @version      2026.11.14
 // @description  Colors the Swisscom cockpit data bar by burn rate and adds an ideal billing-period pace bar plus exact percentage
 // @author       You
 // @match        https://cockpit.swisscom.ch/cockpit/device/Postpaid/ServiceDetails*
 // @grant        none
 // @run-at       document-idle
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/swisscom
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/swisscom/swisscom_data_usage_tracker.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/swisscom/swisscom_data_usage_tracker.user.js
 // ==/UserScript==
 
 (function() {

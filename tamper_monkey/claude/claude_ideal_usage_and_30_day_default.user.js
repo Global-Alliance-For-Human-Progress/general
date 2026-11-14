@@ -1,11 +1,15 @@
 // ==UserScript==
 // @name         Claude Usage Tracker - Ideal Usage and 30-Day Default
 // @namespace    http://tampermonkey.net/
-// @version      2026.10.02
+// @version      2026.11.14
 // @description  Adds a color-coded ideal usage limit progress bar to Claude usage meters, and defaults the usage date range to Last 30 days.
 // @author       You
 // @match        https://claude.ai/*
 // @grant        none
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/claude
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/claude/claude_ideal_usage_and_30_day_default.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/claude/claude_ideal_usage_and_30_day_default.user.js
 // ==/UserScript==
 
 (function() {

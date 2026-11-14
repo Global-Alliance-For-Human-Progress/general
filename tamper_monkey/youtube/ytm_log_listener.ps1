@@ -1,4 +1,4 @@
-# Receives log lines POSTed by youtube_music_background_keep_playing.js and appends them,
+# Receives log lines POSTed by youtube_music_background_keep_playing.user.js and appends them,
 # timestamped, to ytm-fix.log next to this script. Stop with Ctrl+C.
 param([int]$Port = 8765)
 

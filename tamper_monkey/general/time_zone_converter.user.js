@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Time Zone Converter
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.13.2
+// @version      2026.11.14
 // @description  Finds times written with a time zone (e.g. "12:00 PM UTC", "11:04:50 AM EST", "09:30 UTC+2") on any page and rewrites them into your preferred time zone and format, so everyone sees time the way that suits them.
 // @author       You
 // @match        *://*/*
@@ -9,6 +9,10 @@
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @run-at       document-idle
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/general
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/general/time_zone_converter.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/general/time_zone_converter.user.js
 // ==/UserScript==
 
 (function () {

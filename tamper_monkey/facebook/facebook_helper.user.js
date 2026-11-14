@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Facebook Helper: Auto Unmute, Background Play & Video/Image Downloader
 // @namespace    http://tampermonkey.net/
-// @version      2026.10.17.1
+// @version      2026.11.14
 // @description  Autoplay on page load, force unmute, allow background play, keep paused until manually unpaused, and download the current video or image on Facebook
 // @author       Liam
 // @match        https://www.facebook.com/*
@@ -11,6 +11,10 @@
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @run-at       document-start
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/facebook
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/facebook/facebook_helper.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/facebook/facebook_helper.user.js
 // ==/UserScript==
 
 (function () {

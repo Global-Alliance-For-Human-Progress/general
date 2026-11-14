@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Cineby: Subtitle Fullscreen Fix + Popup Blocker
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.14
+// @version      2026.11.14.1
 // @description  Keeps subtitles visible in fullscreen on cineby.xyz and blocks ad popups / new tabs opened by clicks (e.g. on pause)
 // @author       Liam
 // @match        https://cineby.xyz/*
@@ -10,6 +10,10 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=cineby.xyz
 // @grant        none
 // @run-at       document-start
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/cineby
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/cineby/cineby_subtitle_fullscreen_popup_block.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/cineby/cineby_subtitle_fullscreen_popup_block.user.js
 // ==/UserScript==
 
 (function () {

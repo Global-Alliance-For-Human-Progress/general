@@ -1,11 +1,15 @@
 // ==UserScript==
 // @name         Reddit Remove "Get the best of Reddit" Popup
 // @namespace    reddit-remove-best-of-popup
-// @version      2026.11.11
+// @version      2026.11.14
 // @description  Removes the undismissable "Get the best of Reddit" overlay on desktop web and restores page scrolling. Workaround until Reddit fixes it.
 // @match        https://www.reddit.com/*
 // @run-at       document-idle
 // @grant        none
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/reddit
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/reddit/reddit_remove_get_the_best_of_reddit_popup.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/reddit/reddit_remove_get_the_best_of_reddit_popup.user.js
 // ==/UserScript==
 
 // Bug report: https://www.reddit.com/r/bugs/comments/1xtdoro/desktop_web_undismissable_get_the_best_of_reddit/

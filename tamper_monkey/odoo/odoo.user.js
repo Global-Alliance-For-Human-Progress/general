@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Tweaks (debug mode + search focus fix)
 // @namespace    http://tampermonkey.net/
-// @version      2026.10.01
+// @version      2026.11.14
 // @description  Adds ?debug=1 to odoo.com URLs and forces focus/deselects text in the Odoo Command Palette
 // @author       Liam
 // @match        *://odoo.com/*
@@ -9,9 +9,11 @@
 // @match        *://*/odoo*
 // @match        *://*/web*
 // @run-at       document-start
-// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/odoo/odoo.user.js
-// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/odoo/odoo.user.js
 // @grant        none
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/odoo
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/odoo/odoo.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/odoo/odoo.user.js
 // ==/UserScript==
 
 (function() {

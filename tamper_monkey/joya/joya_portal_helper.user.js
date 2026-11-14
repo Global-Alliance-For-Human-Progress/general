@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         Joya Portal Helper
 // @namespace    https://portal-test.joya.ch/
-// @version      2026.11.04.1
+// @version      2026.11.14
 // @description  On every Joya portal page: switches the /de/ URL to /en/. On the login page: auto-clicks the "Sign in with Joya" button
 // @match        https://portal-test.joya.ch/*
 // @match        https://portal.joya.ch/*
 // @grant        none
 // @run-at       document-start
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/joya
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/joya/joya_portal_helper.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/joya/joya_portal_helper.user.js
 // ==/UserScript==
 
 (function () {

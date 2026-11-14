@@ -1,9 +1,15 @@
 // ==UserScript==
 // @name         Modmail Turbo Scroll (Speed Run)
 // @namespace    reddit-modmail-turbo
+// @version      2026.11.14
+// @description  Turbo-scrolls the Reddit modmail list to speed through all conversations
 // @match        https://www.reddit.com/mail/all
 // @match        https://old.reddit.com/mail/all
 // @grant        none
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/reddit
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/reddit/modmail_turbo_scroll.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/reddit/modmail_turbo_scroll.user.js
 // ==/UserScript==
 
 (function () {

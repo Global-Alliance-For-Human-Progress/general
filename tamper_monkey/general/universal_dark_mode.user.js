@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Dark Mode
 // @namespace    http://tampermonkey.net/
-// @version      2026.09.05.12
+// @version      2026.11.14
 // @description  Dynamic-theme dark mode: rewrites each element's actual background/text/border colors (HSL lightness remap, like Dark Reader's Dynamic Theme) instead of a blanket CSS filter, with per-site exceptions and a draggable toggle button.
 // @author       You
 // @match        *://*/*
@@ -10,6 +10,10 @@
 // @grant        GM_addValueChangeListener
 // @grant        GM_registerMenuCommand
 // @run-at       document-start
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/general
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/general/universal_dark_mode.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/general/universal_dark_mode.user.js
 // ==/UserScript==
 
 (function () {

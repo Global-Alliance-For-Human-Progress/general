@@ -1,13 +1,17 @@
 // ==UserScript==
 // @name         YouTube Brave Stuck Timer Fix
 // @namespace    http://tampermonkey.net/
-// @version      2026.08.09
+// @version      2026.11.14
 // @description  Detects YouTube's on-screen timer/scrubber desyncing from real playback (common on Brave) and drives it from the real video time instead of reloading
 // @author       You
 // @match        https://www.youtube.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=youtube.com
 // @grant        none
 // @run-at       document-idle
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/youtube
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/youtube/youtube_brave_fix.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/youtube/youtube_brave_fix.user.js
 // ==/UserScript==
 
 (function () {

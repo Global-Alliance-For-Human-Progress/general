@@ -1,13 +1,17 @@
 // ==UserScript==
 // @name         TikTok Disable Photo Carousel Autoplay + Image & Video Downloader
 // @namespace    tiktok-no-autoplay
-// @version      2026.11.13.2
+// @version      2026.11.14
 // @description  Disables TikTok photo auto-scrolling and provides reliable GM_download buttons for slide images and videos
 // @match        https://www.tiktok.com/*
 // @grant        GM_download
 // @grant        GM_xmlhttpRequest
 // @connect      *
 // @run-at       document-start
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/tiktok
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/tiktok/photo_carousel_autoplay_image_video_downloader.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/tiktok/photo_carousel_autoplay_image_video_downloader.user.js
 // ==/UserScript==
 
 (function () {

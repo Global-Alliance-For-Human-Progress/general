@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         LinkedIn Unfollow All
 // @namespace    linkedin-unfollow-all
-// @version      2026.09.14.7
+// @version      2026.11.14
 // @description  Finds people you follow in the feed and unfollows them (and hides ads), one post's control menu at a time
 // @author       Liam
 // @match        https://www.linkedin.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=linkedin.com
 // @grant        none
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/linkedin
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/linkedin/linkedin_unfollow_all.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/linkedin/linkedin_unfollow_all.user.js
 // ==/UserScript==
 
 (function () {

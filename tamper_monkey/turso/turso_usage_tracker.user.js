@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         Turso Database Usage Percentage
 // @namespace    http://tampermonkey.net/
-// @version      2026.09.19
+// @version      2026.11.14
 // @description  Shows exact color-coded usage percentages for Turso database reads, writes, and syncs
 // @author       You
 // @match        https://app.turso.tech/*
 // @grant        none
 // @run-at       document-idle
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/turso
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/turso/turso_usage_tracker.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/turso/turso_usage_tracker.user.js
 // ==/UserScript==
 
 (function() {

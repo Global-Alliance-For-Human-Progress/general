@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         YouTube Music Background Playback Fixer
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.04.1
+// @version      2026.11.14
 // @description  Keeps YouTube Music playing in background tabs: keeps the tab awake between tracks, resumes after track-change stalls, advances when the queue stops after a song, dismisses idle prompts
 // @author       You
 // @match        https://music.youtube.com/*
@@ -11,6 +11,10 @@
 // @connect      localhost
 // @connect      127.0.0.1
 // @run-at       document-start
+// @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/youtube
+// @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/youtube/youtube_music_background_keep_playing.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/youtube/youtube_music_background_keep_playing.user.js
 // ==/UserScript==
 
 (function () {
