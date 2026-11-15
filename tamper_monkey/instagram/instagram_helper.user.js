@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Instagram Auto Unmute, Background Play & Media Downloader
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.15
+// @version      2026.11.15.1
 // @description  Autoplay on page load, force unmute, allow background play, and download current image or video
 // @author       Liam
 // @match        https://www.instagram.com/*
@@ -263,7 +263,7 @@
     }
 
     function saveUrl(url, filename, btn) {
-        const reset = () => setTimeout(() => { btn.innerText = labelFor(getActiveMedia()); }, 1500);
+        const reset = () => setTimeout(() => { btn.dataset.busy = '0'; btn.innerText = labelFor(getActiveMedia()); }, 1500);
         if (typeof GM_download === 'function') {
             GM_download({
                 url,
@@ -299,7 +299,7 @@
 
     async function handleDownload(btn) {
         const media = getActiveMedia();
-        const reset = () => setTimeout(() => { btn.innerText = labelFor(getActiveMedia()); }, 1500);
+        const reset = () => setTimeout(() => { btn.dataset.busy = '0'; btn.innerText = labelFor(getActiveMedia()); }, 1500);
 
         if (!media) {
             btn.innerText = '❌ No Media Found';
@@ -307,7 +307,7 @@
             return;
         }
 
-        btn.innerText = '⏳ Downloading...';
+        btn.dataset.busy = '1'; btn.innerText = '⏳ Downloading...';
         if (media.type === 'video') {
             try {
                 const url = await resolveVideoUrl(media.el);
@@ -373,7 +373,10 @@
 
         const media = getActiveMedia();
         btn.style.display = media ? 'block' : 'none';
-        if (media && !btn.innerText.match(/Downloading|Saved|Failed|Error/)) btn.innerText = labelFor(media);
+        if (media && btn.dataset.busy !== '1') {
+            const label = labelFor(media);
+            if (btn.textContent !== label) btn.textContent = label;
+        }
     }
 
     function scanAndManage() {
