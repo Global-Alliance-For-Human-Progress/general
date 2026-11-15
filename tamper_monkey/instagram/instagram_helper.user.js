@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Instagram Auto Unmute, Background Play & Image Downloader
+// @name         Instagram Auto Unmute, Background Play & Media Downloader
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.14
-// @description  Autoplay on page load, force unmute, allow background play, and download current image/reel poster
+// @version      2026.11.15
+// @description  Autoplay on page load, force unmute, allow background play, and download current image or video
 // @author       Liam
 // @match        https://www.instagram.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=instagram.com
@@ -175,60 +175,110 @@
 
     /* --- IMAGE DOWNLOADER SECTION --- */
 
-    function getActiveInstagramImageUrl() {
-        // Strategy A: Post image, carousel slide, modal dialog image, or story
+    function getActiveVideo() {
+        const videos = Array.from(document.querySelectorAll('video')).filter(v => isElementVisible(v) && v.offsetWidth > 180 && v.offsetHeight > 180);
+        if (!videos.length) return null;
+        videos.sort((a, b) => (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight));
+        return videos[0];
+    }
+
+    function getActiveImage() {
         const images = Array.from(document.querySelectorAll('article img, main img, div[role="dialog"] img, div[role="presentation"] img'));
         const visibleImgs = images.filter(img => {
             const src = img.src || '';
             const isMedia = src.includes('cdninstagram') || src.includes('fbcdn') || src.startsWith('http');
             return isMedia && isElementVisible(img) && img.offsetWidth > 180 && img.offsetHeight > 180;
         });
+        if (!visibleImgs.length) return null;
+        visibleImgs.sort((a, b) => (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight));
+        return visibleImgs[0];
+    }
 
-        if (visibleImgs.length > 0) {
-            visibleImgs.sort((a, b) => (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight));
-            return visibleImgs[0].src;
+    // Returns { type: 'video'|'image', el } for the main visible media, or null
+    function getActiveMedia() {
+        const video = getActiveVideo();
+        const img = getActiveImage();
+        if (video && img) {
+            const va = video.offsetWidth * video.offsetHeight;
+            const ia = img.offsetWidth * img.offsetHeight;
+            return va >= ia ? { type: 'video', el: video } : { type: 'image', el: img };
         }
-
-        // Strategy B: Poster frame on active video / reel
-        const videos = Array.from(document.querySelectorAll('video'));
-        const activeVideo = videos.find(v => isElementVisible(v) && v.poster);
-        if (activeVideo) {
-            return activeVideo.poster;
-        }
-
+        if (video) return { type: 'video', el: video };
+        if (img) return { type: 'image', el: img };
         return null;
     }
 
-    function handleDownload(btn) {
-        const imgUrl = getActiveInstagramImageUrl();
+    function shortcodeToMediaId(shortcode) {
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+        let id = 0n;
+        for (const c of shortcode) id = id * 64n + BigInt(alphabet.indexOf(c));
+        return id.toString();
+    }
 
-        if (!imgUrl) {
-            btn.innerText = '❌ No Image Found';
-            setTimeout(() => { btn.innerText = '💾 Download Image'; }, 1500);
-            return;
+    function getMediaIdForVideo(video) {
+        const scope = video.closest('article') || video.closest('div[role="dialog"]') || document;
+        const link = scope.querySelector('a[href*="/p/"], a[href*="/reel/"], a[href*="/tv/"]');
+        const re = /\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/;
+        const m = (link && link.getAttribute('href').match(re)) || location.pathname.match(re);
+        if (m) return shortcodeToMediaId(m[1]);
+        const st = location.pathname.match(/\/stories\/[^/]+\/(\d+)/);
+        return st ? st[1] : null;
+    }
+
+    function gmFetchJson(url) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: 'GET',
+                url,
+                responseType: 'json',
+                headers: { 'X-IG-App-ID': '936619743392459', 'Accept': '*/*' },
+                anonymous: false,
+                onload: (res) => {
+                    try { resolve(typeof res.response === 'object' && res.response ? res.response : JSON.parse(res.responseText)); }
+                    catch (e) { reject(e); }
+                },
+                onerror: reject
+            });
+        });
+    }
+
+    async function resolveVideoUrl(video) {
+        if (video.src && /^https?:/.test(video.src)) return video.src;
+        const mediaId = getMediaIdForVideo(video);
+        if (!mediaId) throw new Error('No media id found');
+        const data = await gmFetchJson(`https://www.instagram.com/api/v1/media/${mediaId}/info/`);
+        const item = data && data.items && data.items[0];
+        if (!item) throw new Error('No media info');
+        let node = item;
+        if (item.carousel_media) {
+            const vids = item.carousel_media.filter(c => c.video_versions);
+            node = vids.find(c => Math.abs((c.video_duration || 0) - video.duration) < 0.5) || vids[0];
         }
+        if (!node || !node.video_versions || !node.video_versions.length) throw new Error('No video url');
+        return node.video_versions[0].url;
+    }
 
-        btn.innerText = '⏳ Downloading...';
-        const filename = `instagram_${Date.now()}.jpg`;
+    function labelFor(media) {
+        return media && media.type === 'video' ? '💾 Download Video' : '💾 Download Image';
+    }
 
+    function saveUrl(url, filename, btn) {
+        const reset = () => setTimeout(() => { btn.innerText = labelFor(getActiveMedia()); }, 1500);
         if (typeof GM_download === 'function') {
             GM_download({
-                url: imgUrl,
+                url,
                 name: filename,
-                onload: () => {
-                    btn.innerText = '✅ Saved!';
-                    setTimeout(() => { btn.innerText = '💾 Download Image'; }, 1500);
-                },
+                onload: () => { btn.innerText = '✅ Saved!'; reset(); },
                 onerror: (err) => {
                     btn.innerText = '❌ Failed';
                     console.error('GM_download error:', err);
-                    setTimeout(() => { btn.innerText = '💾 Download Image'; }, 1500);
+                    reset();
                 }
             });
         } else if (typeof GM_xmlhttpRequest === 'function') {
             GM_xmlhttpRequest({
                 method: 'GET',
-                url: imgUrl,
+                url,
                 responseType: 'blob',
                 onload: (res) => {
                     const blobUrl = URL.createObjectURL(res.response);
@@ -240,13 +290,35 @@
                     a.remove();
                     URL.revokeObjectURL(blobUrl);
                     btn.innerText = '✅ Saved!';
-                    setTimeout(() => { btn.innerText = '💾 Download Image'; }, 1500);
+                    reset();
                 },
-                onerror: () => {
-                    btn.innerText = '❌ Error';
-                    setTimeout(() => { btn.innerText = '💾 Download Image'; }, 1500);
-                }
+                onerror: () => { btn.innerText = '❌ Error'; reset(); }
             });
+        }
+    }
+
+    async function handleDownload(btn) {
+        const media = getActiveMedia();
+        const reset = () => setTimeout(() => { btn.innerText = labelFor(getActiveMedia()); }, 1500);
+
+        if (!media) {
+            btn.innerText = '❌ No Media Found';
+            reset();
+            return;
+        }
+
+        btn.innerText = '⏳ Downloading...';
+        if (media.type === 'video') {
+            try {
+                const url = await resolveVideoUrl(media.el);
+                saveUrl(url, `instagram_${Date.now()}.mp4`, btn);
+            } catch (e) {
+                console.error('Video download error:', e);
+                btn.innerText = '❌ Video Failed';
+                reset();
+            }
+        } else {
+            saveUrl(media.el.src, `instagram_${Date.now()}.jpg`, btn);
         }
     }
 
@@ -299,8 +371,9 @@
         const btn = document.getElementById('tm-ig-dl-btn');
         if (!btn) return;
 
-        const imgUrl = getActiveInstagramImageUrl();
-        btn.style.display = imgUrl ? 'block' : 'none';
+        const media = getActiveMedia();
+        btn.style.display = media ? 'block' : 'none';
+        if (media && !btn.innerText.match(/Downloading|Saved|Failed|Error/)) btn.innerText = labelFor(media);
     }
 
     function scanAndManage() {
