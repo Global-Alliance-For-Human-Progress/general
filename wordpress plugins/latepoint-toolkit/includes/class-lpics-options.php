@@ -33,7 +33,13 @@ class LPICS_Options {
 	}
 
 	public static function block_busy_enabled() {
-		return self::get( 'block_busy', '1' ) === '1';
+		// 1.4.2: off by default, and switched off once on existing installs, because
+		// a booking's own iCloud event made its slot unavailable to everyone else.
+		if ( '1' !== self::get( 'block_busy_reset_142', '' ) ) {
+			self::set( 'block_busy', '0' );
+			self::set( 'block_busy_reset_142', '1' );
+		}
+		return self::get( 'block_busy', '0' ) === '1';
 	}
 
 	/** Attach a "new booking" alarm to freshly-created events so the owner is alerted. */

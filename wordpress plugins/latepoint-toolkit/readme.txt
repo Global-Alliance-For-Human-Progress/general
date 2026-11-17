@@ -3,7 +3,7 @@ Contributors: Liam Bartsch
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 License: GPLv2 or later
 
 Free LatePoint add-ons as a companion plugin: two-way Apple iCloud Calendar sync
@@ -140,6 +140,11 @@ or run only one. They use separate booking meta keys so they will not corrupt
 each other, but syncing the same booking into two places at once is confusing.
 
 == Changelog ==
+
+= 1.4.2 =
+* Change: "Block availability using the iCloud calendar" is now off by default and
+  was switched off once on existing sites, so bookings (and their events) no
+  longer make a slot unavailable. Tick it again on the settings page to re-enable.
 
 = 1.4.1 =
 * Fix: our own booking events are now also recognised by their UID (lpics-...),
