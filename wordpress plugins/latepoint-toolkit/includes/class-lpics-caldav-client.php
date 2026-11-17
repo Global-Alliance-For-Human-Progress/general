@@ -778,6 +778,9 @@ class LPICS_CalDAV_Client {
 				case 'TRANSP':
 					$cur['transp'] = strtoupper( trim( $value ) );
 					break;
+				case 'X-LPICS-BOOKING-ID':
+					$cur['own_booking'] = trim( $value );
+					break;
 			}
 		}
 
@@ -794,6 +797,12 @@ class LPICS_CalDAV_Client {
 		}
 		if ( isset( $cur['transp'] ) && 'TRANSPARENT' === $cur['transp'] ) {
 			return null; // marked "free", does not occupy time
+		}
+		// Events this plugin pushed for LatePoint bookings must not block the slot
+		// again, otherwise the first booking makes the slot unavailable for others.
+		// Overlap between bookings is LatePoint's job (service capacity).
+		if ( ! empty( $cur['own_booking'] ) && apply_filters( 'lpics_ignore_own_booking_events', true ) ) {
+			return null;
 		}
 
 		$start_params = isset( $cur['dtstart_params'] ) ? $cur['dtstart_params'] : array();
