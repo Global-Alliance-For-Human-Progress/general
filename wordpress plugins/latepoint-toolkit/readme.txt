@@ -3,7 +3,7 @@ Contributors: Liam Bartsch
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.3.1
+Stable tag: 1.4.0
 License: GPLv2 or later
 
 Free LatePoint add-ons as a companion plugin: two-way Apple iCloud Calendar sync
@@ -140,6 +140,12 @@ or run only one. They use separate booking meta keys so they will not corrupt
 each other, but syncing the same booking into two places at once is confusing.
 
 == Changelog ==
+
+= 1.4.0 =
+* New: "People per slot" setting. Writes the capacity into every LatePoint service
+  (LatePoint core already enforces it, but the free plugin has no field for it),
+  so several people can book the same slot. Each booking still gets its own
+  iCloud event and ntfy push. 0 = off.
 
 = 1.3.1 =
 * Fix: events this plugin pushes to iCloud for a booking are no longer read back

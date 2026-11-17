@@ -50,4 +50,31 @@ class LPICS_Options {
 	public static function agent_id() {
 		return (int) self::get( 'agent_id', 0 );
 	}
+
+	/** Max people per slot (LatePoint service capacity_max). 0 = off, leave services alone. */
+	public static function slot_capacity() {
+		return max( 0, (int) self::get( 'slot_capacity', 0 ) );
+	}
+
+	/**
+	 * Write the chosen capacity into every LatePoint service. LatePoint core already
+	 * enforces services.capacity_max when it checks a slot (OsBookingHelper::
+	 * is_timeframe_in_booked_periods), but the free plugin has no field to edit it.
+	 * Turning the option off resets services we changed back to 1.
+	 */
+	public static function apply_slot_capacity() {
+		global $wpdb;
+		if ( ! defined( 'LATEPOINT_TABLE_SERVICES' ) ) {
+			return;
+		}
+		$cap     = self::slot_capacity();
+		$applied = (int) self::get( 'slot_capacity_applied', 0 );
+		if ( $cap >= 2 ) {
+			$wpdb->query( $wpdb->prepare( 'UPDATE ' . LATEPOINT_TABLE_SERVICES . ' SET capacity_min = 1, capacity_max = %d', $cap ) );
+			self::set( 'slot_capacity_applied', $cap );
+		} elseif ( $applied >= 2 ) {
+			$wpdb->query( 'UPDATE ' . LATEPOINT_TABLE_SERVICES . ' SET capacity_min = 1, capacity_max = 1' );
+			self::set( 'slot_capacity_applied', 0 );
+		}
+	}
 }

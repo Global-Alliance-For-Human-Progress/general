@@ -30,5 +30,6 @@ function lpics_bootstrap() {
 
 	// Wire up the sync hooks only when LatePoint is really there.
 	new LPICS_Sync();
+	add_action( 'latepoint_service_saved', array( 'LPICS_Options', 'apply_slot_capacity' ), 20 );
 	new LPSP_Methods();
 }

@@ -65,6 +65,8 @@ class LPICS_Settings {
 			LPICS_Options::set( 'sync_out', isset( $_POST['lpics_sync_out'] ) ? '1' : '0' );
 			LPICS_Options::set( 'block_busy', isset( $_POST['lpics_block_busy'] ) ? '1' : '0' );
 			LPICS_Options::set( 'notify_on_create', isset( $_POST['lpics_notify_on_create'] ) ? '1' : '0' );
+			LPICS_Options::set( 'slot_capacity', max( 0, (int) ( $_POST['lpics_slot_capacity'] ?? 0 ) ) );
+			LPICS_Options::apply_slot_capacity();
 			LPICS_Options::set( 'ntfy_topic', preg_replace( '/[^A-Za-z0-9_-]/', '', (string) wp_unslash( $_POST['lpics_ntfy_topic'] ?? '' ) ) );
 			LPICS_Options::set( 'ntfy_server', untrailingslashit( esc_url_raw( wp_unslash( $_POST['lpics_ntfy_server'] ?? '' ) ) ) );
 
@@ -438,6 +440,13 @@ class LPICS_Settings {
 								Alert me when a new booking is created (adds a calendar notification a couple of minutes after each new booking)
 							</label>
 							<p class="description">Note: all-day iCloud events (birthdays, holidays) do not block bookings by default, and events marked &ldquo;free&rdquo; are ignored. The new-booking alert attaches a real calendar alarm to each new event, so it fires on your Apple devices a couple of minutes after the booking syncs (not before the appointment). See readme.txt.</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row">People per slot</th>
+						<td>
+							<input type="number" min="0" max="500" class="small-text" name="lpics_slot_capacity" value="<?php echo esc_attr( LPICS_Options::slot_capacity() ); ?>">
+							<p class="description">How many people may book the same time slot (applies to all services). 0 = off, LatePoint decides (normally 1 person per slot). Each booking still creates its own iCloud event and ntfy push.</p>
 						</td>
 					</tr>
 					<tr>
