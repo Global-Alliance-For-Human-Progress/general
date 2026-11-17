@@ -57,30 +57,61 @@ class LPICS_Options {
 		return (int) self::get( 'agent_id', 0 );
 	}
 
-	/** Max people per slot (LatePoint service capacity_max). 0 = off, leave services alone. */
-	public static function slot_capacity() {
-		return max( 0, (int) self::get( 'slot_capacity', 0 ) );
+	/**
+	 * Capacity list as typed, e.g. "20,10,3". One number applies to every service,
+	 * several numbers apply to the services in order (oldest service first).
+	 */
+	public static function slot_capacity_raw() {
+		return (string) self::get( 'slot_capacity', '' );
+	}
+
+	/** @return int[] parsed numbers, 0 = leave that service alone. */
+	public static function slot_capacity_list() {
+		$parts = preg_split( '/[\s,;]+/', self::slot_capacity_raw(), -1, PREG_SPLIT_NO_EMPTY );
+		return array_map( function ( $n ) {
+			return max( 0, min( 500, (int) $n ) );
+		}, $parts );
+	}
+
+	/** LatePoint services in the order the capacity list applies to: [id => name]. */
+	public static function services_in_order() {
+		global $wpdb;
+		if ( ! defined( 'LATEPOINT_TABLE_SERVICES' ) ) {
+			return array();
+		}
+		$rows = $wpdb->get_results( 'SELECT id, name FROM ' . LATEPOINT_TABLE_SERVICES . ' ORDER BY id ASC' );
+		$out  = array();
+		foreach ( (array) $rows as $r ) {
+			$out[ (int) $r->id ] = (string) $r->name;
+		}
+		return $out;
 	}
 
 	/**
-	 * Write the chosen capacity into every LatePoint service. LatePoint core already
+	 * Write the chosen capacities into the LatePoint services. LatePoint core already
 	 * enforces services.capacity_max when it checks a slot (OsBookingHelper::
 	 * is_timeframe_in_booked_periods), but the free plugin has no field to edit it.
-	 * Turning the option off resets services we changed back to 1.
+	 * A service we changed earlier and that is now off (0 or no value) goes back to 1.
 	 */
 	public static function apply_slot_capacity() {
 		global $wpdb;
 		if ( ! defined( 'LATEPOINT_TABLE_SERVICES' ) ) {
 			return;
 		}
-		$cap     = self::slot_capacity();
-		$applied = (int) self::get( 'slot_capacity_applied', 0 );
-		if ( $cap >= 2 ) {
-			$wpdb->query( $wpdb->prepare( 'UPDATE ' . LATEPOINT_TABLE_SERVICES . ' SET capacity_min = 1, capacity_max = %d', $cap ) );
-			self::set( 'slot_capacity_applied', $cap );
-		} elseif ( $applied >= 2 ) {
-			$wpdb->query( 'UPDATE ' . LATEPOINT_TABLE_SERVICES . ' SET capacity_min = 1, capacity_max = 1' );
-			self::set( 'slot_capacity_applied', 0 );
+		$list    = self::slot_capacity_list();
+		$applied = (array) self::get( 'slot_capacity_applied', array() );
+		$next    = array();
+		$i       = 0;
+		foreach ( array_keys( self::services_in_order() ) as $service_id ) {
+			$cap = isset( $list[ $i ] ) ? $list[ $i ] : ( 1 === count( $list ) ? $list[0] : 0 );
+			$i++;
+			if ( $cap >= 2 ) {
+				$wpdb->query( $wpdb->prepare( 'UPDATE ' . LATEPOINT_TABLE_SERVICES . ' SET capacity_min = 1, capacity_max = %d WHERE id = %d', $cap, $service_id ) );
+				$next[ $service_id ] = $cap;
+			} elseif ( ! empty( $applied[ $service_id ] ) ) {
+				$wpdb->query( $wpdb->prepare( 'UPDATE ' . LATEPOINT_TABLE_SERVICES . ' SET capacity_min = 1, capacity_max = 1 WHERE id = %d', $service_id ) );
+			}
 		}
+		self::set( 'slot_capacity_applied', $next );
 	}
 }

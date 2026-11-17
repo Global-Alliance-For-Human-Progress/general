@@ -3,7 +3,7 @@ Contributors: Liam Bartsch
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.4.2
+Stable tag: 1.4.3
 License: GPLv2 or later
 
 Free LatePoint add-ons as a companion plugin: two-way Apple iCloud Calendar sync
@@ -140,6 +140,11 @@ or run only one. They use separate booking meta keys so they will not corrupt
 each other, but syncing the same booking into two places at once is confusing.
 
 == Changelog ==
+
+= 1.4.3 =
+* New: "People per slot" accepts a comma list (for example 20,10,3) to set a
+  different capacity per service, in the order shown on the settings page.
+  A single number still applies to all services.
 
 = 1.4.2 =
 * Change: "Block availability using the iCloud calendar" is now off by default and

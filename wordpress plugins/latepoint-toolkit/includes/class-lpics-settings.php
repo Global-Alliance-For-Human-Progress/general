@@ -65,7 +65,7 @@ class LPICS_Settings {
 			LPICS_Options::set( 'sync_out', isset( $_POST['lpics_sync_out'] ) ? '1' : '0' );
 			LPICS_Options::set( 'block_busy', isset( $_POST['lpics_block_busy'] ) ? '1' : '0' );
 			LPICS_Options::set( 'notify_on_create', isset( $_POST['lpics_notify_on_create'] ) ? '1' : '0' );
-			LPICS_Options::set( 'slot_capacity', max( 0, (int) ( $_POST['lpics_slot_capacity'] ?? 0 ) ) );
+			LPICS_Options::set( 'slot_capacity', preg_replace( '/[^0-9,]/', '', (string) wp_unslash( $_POST['lpics_slot_capacity'] ?? '' ) ) );
 			LPICS_Options::apply_slot_capacity();
 			LPICS_Options::set( 'ntfy_topic', preg_replace( '/[^A-Za-z0-9_-]/', '', (string) wp_unslash( $_POST['lpics_ntfy_topic'] ?? '' ) ) );
 			LPICS_Options::set( 'ntfy_server', untrailingslashit( esc_url_raw( wp_unslash( $_POST['lpics_ntfy_server'] ?? '' ) ) ) );
@@ -445,8 +445,13 @@ class LPICS_Settings {
 					<tr>
 						<th scope="row">People per slot</th>
 						<td>
-							<input type="number" min="0" max="500" class="small-text" name="lpics_slot_capacity" value="<?php echo esc_attr( LPICS_Options::slot_capacity() ); ?>">
-							<p class="description">How many people may book the same time slot (applies to all services). 0 = off, LatePoint decides (normally 1 person per slot). Each booking still creates its own iCloud event and ntfy push.</p>
+							<input type="text" class="regular-text" name="lpics_slot_capacity" value="<?php echo esc_attr( LPICS_Options::slot_capacity_raw() ); ?>" placeholder="e.g. 20,10,3">
+							<p class="description">How many people may book the same time slot. One number applies to all services; a comma list applies to the services in this order: <?php
+								$lpics_i = 1;
+								foreach ( LPICS_Options::services_in_order() as $lpics_name ) {
+									echo esc_html( ( $lpics_i++ ) . '. ' . $lpics_name . '  ' );
+								}
+							?>. Empty or 0 = off, LatePoint decides (normally 1 person per slot). Each booking still creates its own iCloud event and ntfy push.</p>
 						</td>
 					</tr>
 					<tr>
