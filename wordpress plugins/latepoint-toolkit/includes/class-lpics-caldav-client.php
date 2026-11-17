@@ -778,6 +778,12 @@ class LPICS_CalDAV_Client {
 				case 'TRANSP':
 					$cur['transp'] = strtoupper( trim( $value ) );
 					break;
+				case 'UID':
+					// Our events use UIDs starting with lpics-; iCloud may strip the X- property.
+					if ( 0 === strpos( trim( $value ), 'lpics-' ) ) {
+						$cur['own_booking'] = trim( $value );
+					}
+					break;
 				case 'X-LPICS-BOOKING-ID':
 					$cur['own_booking'] = trim( $value );
 					break;
