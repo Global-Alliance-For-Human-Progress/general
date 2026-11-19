@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         TikTok Disable Photo Carousel Autoplay + Image & Video Downloader
+// @name         TikTok Disable Photo Carousel Autoplay + Image & Video Downloader + Image Copier
 // @namespace    tiktok-no-autoplay
-// @version      2026.11.18.3
-// @description  Disables TikTok photo auto-scrolling and provides reliable GM_download buttons for slide images and videos
+// @version      2026.11.19
+// @description  Disables TikTok photo auto-scrolling and provides download buttons for slide images and videos, plus a button to copy the current image to the clipboard
 // @match        https://www.tiktok.com/*
 // @grant        GM_download
 // @grant        GM_xmlhttpRequest
@@ -10,8 +10,8 @@
 // @run-at       document-start
 // @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/tiktok
 // @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
-// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/tiktok/photo_carousel_autoplay_image_video_downloader.user.js
-// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/tiktok/photo_carousel_autoplay_image_video_downloader.user.js
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/tiktok/photo_carousel_autoplay_image_video_downloader_copier.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/tiktok/photo_carousel_autoplay_image_video_downloader_copier.user.js
 // ==/UserScript==
 
 (function () {
@@ -310,6 +310,41 @@
     downloadUrl(btn, imgUrl, `tiktok_photo_${Date.now()}.jpeg`, IMAGE_LABEL);
   }
 
+  // Clipboard only accepts PNG, so decode whatever TikTok serves and re-encode it
+  async function blobToPng(blob) {
+    const bmp = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+    canvas.getContext('2d').drawImage(bmp, 0, 0);
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error('PNG encode failed'))), 'image/png');
+    });
+  }
+
+  async function handleImageCopy(btn) {
+    const finish = (text, ms) => {
+      btn.innerText = text;
+      setTimeout(() => { btn.innerText = COPY_LABEL; }, ms);
+    };
+    const imgUrl = getActiveSlideImageUrl();
+    if (!imgUrl) return finish('❌ No Image Found', 1500);
+
+    btn.innerText = '⏳ Copying...';
+    try {
+      // Passing a promise keeps the user gesture valid while the image downloads
+      const pngPromise = fetchBlob(imgUrl).then(b => {
+        if (!b) throw new Error('Image fetch failed');
+        return blobToPng(b);
+      });
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngPromise })]);
+      finish('✅ Copied!', 1500);
+    } catch (e) {
+      console.error('Copy failed:', e);
+      finish('❌ Copy Failed', 1500);
+    }
+  }
+
   // Remembered download folder (File System Access API, handle kept in IndexedDB)
   function idbOpen() {
     return new Promise((resolve, reject) => {
@@ -455,6 +490,7 @@
   const IMAGE_LABEL = '💾 Download Current Image';
   const ALL_IMAGES_LABEL = '🖼️ Download All Images';
   const VIDEO_LABEL = '🎬 Download Video';
+  const COPY_LABEL = '📋 Copy Current Image';
 
   function createFloatingButton(id, label, top, onClick) {
     if (document.getElementById(id)) return;
@@ -515,6 +551,12 @@
       allBtn.style.display = hasCarousel ? 'block' : 'none';
     }
 
+    const copyBtn = document.getElementById('tm-global-copy-btn');
+    if (copyBtn) {
+      const hasCarousel = document.querySelector('.swiper, [class*="swiper"] img, [class*="Photo"] img');
+      copyBtn.style.display = hasCarousel ? 'block' : 'none';
+    }
+
     const videoBtn = document.getElementById('tm-global-dl-video-btn');
     if (videoBtn) {
       videoBtn.style.display = getVisibleVideo() ? 'block' : 'none';
@@ -526,7 +568,8 @@
     swipers.forEach(el => disableAutoplayOnInstance(el));
     createFloatingButton('tm-global-dl-btn', IMAGE_LABEL, 80, handleImageDownload);
     createFloatingButton('tm-global-dl-all-btn', ALL_IMAGES_LABEL, 130, handleAllImagesDownload);
-    createFloatingButton('tm-global-dl-video-btn', VIDEO_LABEL, 180, handleVideoDownload);
+    createFloatingButton('tm-global-copy-btn', COPY_LABEL, 180, handleImageCopy);
+    createFloatingButton('tm-global-dl-video-btn', VIDEO_LABEL, 230, handleVideoDownload);
     updateButtonVisibility();
   }
 
