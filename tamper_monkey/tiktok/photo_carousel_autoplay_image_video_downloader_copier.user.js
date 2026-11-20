@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TikTok Disable Photo Carousel Autoplay + Image & Video Downloader + Image Copier
 // @namespace    tiktok-no-autoplay
-// @version      2026.11.20
-// @description  Disables TikTok photo auto-scrolling and provides download buttons for slide images and videos, plus a button to copy the current image to the clipboard
+// @version      2026.11.20.1
+// @description  Disables TikTok photo auto-scrolling and provides download buttons for slide images and videos, plus a button to copy the current image to the clipboard. Buttons can be dragged anywhere and remember their position
 // @match        https://www.tiktok.com/*
 // @grant        GM_download
 // @grant        GM_xmlhttpRequest
@@ -495,6 +495,72 @@
   const VIDEO_LABEL = '🎬 Download Video';
   const COPY_LABEL = '📋 Copy Current Image';
 
+  // Button positions the user dragged them to, remembered per button
+  const POS_KEY = 'tm-button-positions';
+
+  function loadPositions() {
+    try { return JSON.parse(localStorage.getItem(POS_KEY)) || {}; } catch (e) { return {}; }
+  }
+
+  function savePosition(id, left, top) {
+    try {
+      const all = loadPositions();
+      all[id] = { left, top };
+      localStorage.setItem(POS_KEY, JSON.stringify(all));
+    } catch (e) {}
+  }
+
+  function placeButton(btn, left, top) {
+    const maxLeft = Math.max(0, window.innerWidth - btn.offsetWidth);
+    const maxTop = Math.max(0, window.innerHeight - btn.offsetHeight);
+    btn.style.left = Math.min(Math.max(0, left), maxLeft) + 'px';
+    btn.style.top = Math.min(Math.max(0, top), maxTop) + 'px';
+    btn.style.right = 'auto';
+  }
+
+  // Drag a button anywhere; a press that barely moves still counts as a click
+  function makeDraggable(btn, id) {
+    let startX, startY, startLeft, startTop, dragging = false, pressed = false;
+
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const r = btn.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = r.left;
+      startTop = r.top;
+      pressed = true;
+      dragging = false;
+      btn.setPointerCapture(e.pointerId);
+    }, true);
+
+    btn.addEventListener('pointermove', (e) => {
+      if (!pressed) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (!dragging && Math.hypot(dx, dy) < 5) return;
+      dragging = true;
+      btn.style.cursor = 'grabbing';
+      placeButton(btn, startLeft + dx, startTop + dy);
+    }, true);
+
+    const end = (e) => {
+      if (!pressed) return;
+      pressed = false;
+      btn.style.cursor = 'pointer';
+      if (btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId);
+      if (dragging) {
+        const r = btn.getBoundingClientRect();
+        savePosition(id, r.left, r.top);
+        // Swallow the click that follows a drag so it doesn't trigger a download
+        btn.dataset.justDragged = '1';
+        setTimeout(() => { delete btn.dataset.justDragged; }, 0);
+      }
+    };
+    btn.addEventListener('pointerup', end, true);
+    btn.addEventListener('pointercancel', end, true);
+  }
+
   function createFloatingButton(id, label, top, onClick) {
     if (document.getElementById(id)) return;
 
@@ -517,8 +583,13 @@
       box-shadow: 0 4px 16px rgba(0,0,0,0.4);
       display: none;
       pointer-events: auto;
+      touch-action: none;
+      user-select: none;
       transition: transform 0.1s ease, background 0.2s ease;
     `;
+
+    // Registered before the event isolation below so stopImmediatePropagation doesn't block it
+    makeDraggable(btn, id);
 
     // Isolate event capture
     const events = ['pointerdown', 'mousedown', 'mouseup', 'touchstart', 'touchend'];
@@ -532,6 +603,7 @@
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       e.stopImmediatePropagation();
+      if (btn.dataset.justDragged) return;
       onClick(btn);
     }, true);
 
@@ -539,7 +611,26 @@
     btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
 
     document.body.appendChild(btn);
+
+    // Restore the dragged position. The button is display:none until a carousel or video
+    // shows up, so it has no size yet; apply the saved coordinates and clamp on resize.
+    const saved = loadPositions()[id];
+    if (saved) {
+      btn.style.left = saved.left + 'px';
+      btn.style.top = saved.top + 'px';
+      btn.style.right = 'auto';
+    }
   }
+
+  // Keep dragged buttons on screen if the window shrinks
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('[id^="tm-global-"]').forEach(btn => {
+      if (btn.style.right === 'auto' && btn.offsetWidth) {
+        const r = btn.getBoundingClientRect();
+        placeButton(btn, r.left, r.top);
+      }
+    });
+  });
 
   function updateButtonVisibility() {
     const imgBtn = document.getElementById('tm-global-dl-btn');
