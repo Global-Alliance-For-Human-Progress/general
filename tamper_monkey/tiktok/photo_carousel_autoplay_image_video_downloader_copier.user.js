@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok Disable Photo Carousel Autoplay + Image & Video Downloader + Image Copier
 // @namespace    tiktok-no-autoplay
-// @version      2026.11.19
+// @version      2026.11.20
 // @description  Disables TikTok photo auto-scrolling and provides download buttons for slide images and videos, plus a button to copy the current image to the clipboard
 // @match        https://www.tiktok.com/*
 // @grant        GM_download
@@ -185,7 +185,8 @@
       const item = data.__DEFAULT_SCOPE__['webapp.video-detail'].itemInfo.itemStruct;
       const idMatch = location.pathname.match(/\/video\/(\d+)/);
       if (idMatch && item.id !== idMatch[1]) return null;
-      return item.video.downloadAddr || item.video.playAddr || null;
+      // downloadAddr is the watermarked "save" version, so prefer the clean playAddr
+      return item.video.playAddr || item.video.downloadAddr || null;
     } catch (e) {
       return null;
     }
@@ -214,8 +215,10 @@
       const item = data.__DEFAULT_SCOPE__['webapp.video-detail'].itemInfo.itemStruct;
       if (id && item.id !== id) return null;
       const vid = item.video;
-      return vid.downloadAddr || vid.playAddr ||
-        (vid.bitrateInfo && vid.bitrateInfo[0] && vid.bitrateInfo[0].PlayAddr && vid.bitrateInfo[0].PlayAddr.UrlList[0]) || null;
+      // downloadAddr is the watermarked "save" version, so it is the last resort
+      return vid.playAddr ||
+        (vid.bitrateInfo && vid.bitrateInfo[0] && vid.bitrateInfo[0].PlayAddr && vid.bitrateInfo[0].PlayAddr.UrlList[0]) ||
+        vid.downloadAddr || null;
     } catch (e) {
       return null;
     }
@@ -307,7 +310,7 @@
       setTimeout(() => { btn.innerText = IMAGE_LABEL; }, 1500);
       return;
     }
-    downloadUrl(btn, imgUrl, `tiktok_photo_${Date.now()}.jpeg`, IMAGE_LABEL);
+    downloadUrl(btn, imgUrl, `photo_${Date.now()}.jpeg`, IMAGE_LABEL);
   }
 
   // Clipboard only accepts PNG, so decode whatever TikTok serves and re-encode it
@@ -483,7 +486,7 @@
       return;
     }
     const id = getVideoId(getVisibleVideo());
-    downloadUrl(btn, videoUrl, `tiktok_video_${id || Date.now()}.mp4`, VIDEO_LABEL);
+    downloadUrl(btn, videoUrl, `video_${id || Date.now()}.mp4`, VIDEO_LABEL);
   }
 
   // 6. Create Standalone Floating Overlay Buttons
