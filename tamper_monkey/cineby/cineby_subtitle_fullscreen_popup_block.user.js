@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Cineby: Subtitle Fullscreen Fix + Popup Blocker
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.14.1
-// @description  Keeps subtitles visible in fullscreen on cineby.xyz and blocks ad popups / new tabs opened by clicks (e.g. on pause)
+// @version      2026.11.20
+// @description  Keeps subtitles visible in fullscreen on cineby.xyz, blocks ad popups / new tabs opened by clicks (e.g. on pause) and keeps arrow keys controlling the player after focus drifts
 // @author       Liam
 // @match        https://cineby.xyz/*
 // @match        https://*.cineby.xyz/*
@@ -146,4 +146,53 @@
     setInterval(tick, 150);
     document.addEventListener('fullscreenchange', tick);
     document.addEventListener('webkitfullscreenchange', tick);
+
+    // ---- Keep keyboard control of the player ----
+    // The player is in a cross-origin iframe and only the focused frame gets key presses.
+    // Focus drifts to the parent page (ad overlays, blocked popups, page scripts), after which
+    // arrow keys do nothing until the player is clicked. The parent copy of this script catches
+    // those keys, hands focus back to the player frame and forwards the key to the copy of this
+    // script running inside the frame, which replays it on the player.
+    const FORWARD_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'k', 'j', 'l', 'f', 'm', 'c']);
+    const MSG_TYPE = 'tm-cineby-key';
+
+    if (window.top === window) {
+        const findPlayerFrame = () => {
+            let best = null;
+            let bestArea = 0;
+            document.querySelectorAll('iframe').forEach(f => {
+                const r = f.getBoundingClientRect();
+                const area = r.width * r.height;
+                if (r.width > 300 && r.height > 150 && area > bestArea) {
+                    best = f;
+                    bestArea = area;
+                }
+            });
+            return best;
+        };
+
+        document.addEventListener('keydown', e => {
+            if (!e.isTrusted || e.ctrlKey || e.metaKey || e.altKey || !FORWARD_KEYS.has(e.key)) return;
+            // only when nothing specific has focus, so typing in search boxes and buttons still work
+            const t = e.target;
+            if (t && t !== document.body && t !== document.documentElement) return;
+            const frame = findPlayerFrame();
+            if (!frame || !frame.contentWindow) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            frame.contentWindow.focus();
+            frame.contentWindow.postMessage({ type: MSG_TYPE, key: e.key, code: e.code, keyCode: e.keyCode }, '*');
+        }, true);
+    } else {
+        window.addEventListener('message', e => {
+            const d = e.data;
+            if (e.source !== window.parent || !d || d.type !== MSG_TYPE || !FORWARD_KEYS.has(d.key)) return;
+            window.focus();
+            const ae = document.activeElement;
+            const target = ae && ae !== document.documentElement ? ae : document.body;
+            const init = { key: d.key, code: d.code, keyCode: d.keyCode, which: d.keyCode, bubbles: true, cancelable: true };
+            target.dispatchEvent(new KeyboardEvent('keydown', init));
+            target.dispatchEvent(new KeyboardEvent('keyup', init));
+        });
+    }
 })();
