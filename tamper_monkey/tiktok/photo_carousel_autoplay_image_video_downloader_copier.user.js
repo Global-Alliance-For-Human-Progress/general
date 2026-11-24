@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TikTok Disable Photo Carousel Autoplay + Image & Video Downloader + Image Copier
 // @namespace    tiktok-no-autoplay
-// @version      2026.11.20.1
+// @version      2026.11.24
 // @description  Disables TikTok photo auto-scrolling and provides download buttons for slide images and videos, plus a button to copy the current image to the clipboard. Buttons can be dragged anywhere and remember their position
 // @match        https://www.tiktok.com/*
 // @grant        GM_download
@@ -325,6 +325,38 @@
     });
   }
 
+  // The slide image is already loaded on the page, so a normal fetch usually hits the browser
+  // cache and is far faster than Tampermonkey's blob transfer. GM_xmlhttpRequest is the fallback.
+  async function fetchImageBlobFast(url) {
+    try {
+      const res = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'force-cache' });
+      if (res.ok) return await res.blob();
+    } catch (e) {
+      // CORS not allowed by the CDN, fall through
+    }
+    return fetchBlob(url);
+  }
+
+  // Converted PNG per URL, started on hover so the click only has to write to the clipboard
+  const pngCache = new Map();
+  function getPngForUrl(url) {
+    if (!pngCache.has(url)) {
+      const p = fetchImageBlobFast(url).then(b => {
+        if (!b) throw new Error('Image fetch failed');
+        return blobToPng(b);
+      });
+      p.catch(() => pngCache.delete(url));
+      pngCache.set(url, p);
+      if (pngCache.size > 5) pngCache.delete(pngCache.keys().next().value);
+    }
+    return pngCache.get(url);
+  }
+
+  function prefetchCurrentImage() {
+    const url = getActiveSlideImageUrl();
+    if (url) getPngForUrl(url).catch(() => {});
+  }
+
   async function handleImageCopy(btn) {
     const finish = (text, ms) => {
       btn.innerText = text;
@@ -335,11 +367,8 @@
 
     btn.innerText = '⏳ Copying...';
     try {
-      // Passing a promise keeps the user gesture valid while the image downloads
-      const pngPromise = fetchBlob(imgUrl).then(b => {
-        if (!b) throw new Error('Image fetch failed');
-        return blobToPng(b);
-      });
+      // Passing a promise keeps the user gesture valid while the image is prepared
+      const pngPromise = getPngForUrl(imgUrl);
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngPromise })]);
       finish('✅ Copied!', 1500);
     } catch (e) {
@@ -663,6 +692,11 @@
     createFloatingButton('tm-global-dl-btn', IMAGE_LABEL, 80, handleImageDownload);
     createFloatingButton('tm-global-dl-all-btn', ALL_IMAGES_LABEL, 130, handleAllImagesDownload);
     createFloatingButton('tm-global-copy-btn', COPY_LABEL, 180, handleImageCopy);
+    const copyBtn = document.getElementById('tm-global-copy-btn');
+    if (copyBtn && !copyBtn.dataset.prefetch) {
+      copyBtn.dataset.prefetch = '1';
+      copyBtn.addEventListener('pointerenter', prefetchCurrentImage);
+    }
     createFloatingButton('tm-global-dl-video-btn', VIDEO_LABEL, 230, handleVideoDownload);
     updateButtonVisibility();
   }
