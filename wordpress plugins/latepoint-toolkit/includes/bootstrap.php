@@ -32,4 +32,5 @@ function lpics_bootstrap() {
 	new LPICS_Sync();
 	add_action( 'latepoint_service_saved', array( 'LPICS_Options', 'apply_slot_capacity' ), 20 );
 	new LPSP_Methods();
+	new LPWS_Schedule();
 }

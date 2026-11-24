@@ -3,7 +3,7 @@ Contributors: Liam Bartsch
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.4.3
+Stable tag: 1.5.0
 License: GPLv2 or later
 
 Free LatePoint add-ons as a companion plugin: two-way Apple iCloud Calendar sync
@@ -140,6 +140,12 @@ or run only one. They use separate booking meta keys so they will not corrupt
 each other, but syncing the same booking into two places at once is confusing.
 
 == Changelog ==
+
+= 1.5.0 =
+* New: [lp_week_schedule] shortcode, a week view of your services' open slots (this week,
+  next week and so on) with time, spots left, details and a Book button that opens the
+  LatePoint booking popup preset to that service, date and time. Options: service_ids,
+  weeks (1 to 8, default 4), show_spots (yes/no), button_text.
 
 = 1.4.3 =
 * New: "People per slot" accepts a comma list (for example 20,10,3) to set a
