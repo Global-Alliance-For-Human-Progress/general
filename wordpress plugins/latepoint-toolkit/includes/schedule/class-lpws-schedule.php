@@ -12,6 +12,8 @@
  *   weeks        how many weeks to offer, 1 to 8 (default 4)
  *   show_spots   yes/no, show "N spots left" (default yes)
  *   button_text  caption of the Book button (default "Book")
+ *   theme        light or dark panel (default light); the panel is always opaque so the
+ *                page background image never shows through
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -36,6 +38,7 @@ class LPWS_Schedule {
 				'weeks'       => 4,
 				'show_spots'  => 'yes',
 				'button_text' => 'Book',
+				'theme'       => 'light',
 			),
 			$atts,
 			'lp_week_schedule'
@@ -60,7 +63,8 @@ class LPWS_Schedule {
 		ob_start();
 		$this->print_assets_once();
 		$uid = 'lpws-' . wp_unique_id();
-		echo '<div class="lpws" id="' . esc_attr( $uid ) . '">';
+		$theme_cls = ( 'dark' === strtolower( (string) $atts['theme'] ) ) ? ' lpws--dark' : '';
+		echo '<div class="lpws' . $theme_cls . '" id="' . esc_attr( $uid ) . '">';
 
 		for ( $w = 0; $w < $weeks; $w++ ) {
 			$start = $monday->modify( '+' . ( $w * 7 ) . ' days' );
@@ -227,25 +231,29 @@ class LPWS_Schedule {
 		self::$assets_printed = true;
 		?>
 <style>
-.lpws{--lpws-ink:#33322e;--lpws-line:#e4e1da;--lpws-muted:#7a766d;--lpws-accent:#33322e;font:inherit;color:var(--lpws-ink)}
+.lpws{--lpws-ink:#2b2a27;--lpws-line:#e4e1da;--lpws-muted:#6b675f;--lpws-accent:#2b2a27;--lpws-on-accent:#fff;--lpws-bg:#fff;--lpws-card:#faf9f6;background:var(--lpws-bg);color:var(--lpws-ink);padding:20px;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.18);font:inherit;box-sizing:border-box}
+.lpws--dark{--lpws-ink:#f3f1ec;--lpws-line:#3d3b36;--lpws-muted:#aaa59b;--lpws-accent:#f3f1ec;--lpws-on-accent:#1c1b19;--lpws-bg:#1c1b19;--lpws-card:#262521}
+.lpws *{box-sizing:border-box}
+.lpws p,.lpws strong,.lpws span,.lpws summary,.lpws div,.lpws li{color:var(--lpws-ink);text-shadow:none}
+.lpws .lpws-day-head span,.lpws .lpws-none,.lpws .lpws-time,.lpws .lpws-spots,.lpws .lpws-title span{color:var(--lpws-muted)}
 .lpws-week{display:none}.lpws-week.is-shown{display:block}
 .lpws-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px}
-.lpws-title{margin:0;text-align:center}.lpws-title strong{display:block;font-size:1.15em}.lpws-title span{color:var(--lpws-muted);font-size:.9em}
-.lpws-step{background:none;border:1px solid var(--lpws-line);border-radius:999px;padding:6px 14px;cursor:pointer;color:inherit;font:inherit}
+.lpws-title{margin:0;text-align:center}.lpws-title strong{display:block;font-size:1.15em}.lpws-title span{font-size:.9em}
+.lpws .lpws-step{background:transparent;border:1px solid var(--lpws-line);border-radius:999px;padding:6px 14px;cursor:pointer;color:var(--lpws-ink);font:inherit}
 .lpws-step[hidden]{display:block;visibility:hidden}
 .lpws-days{list-style:none;margin:0;padding:0;display:grid;gap:10px}
-.lpws-day{border:1px solid var(--lpws-line);border-radius:10px;padding:12px 14px}
-.lpws-day.is-past{opacity:.45}.lpws-day.is-today{border-color:var(--lpws-accent)}
-.lpws-day-head{margin:0 0 8px;display:flex;gap:8px;align-items:baseline}.lpws-day-head span{color:var(--lpws-muted)}
-.lpws-none{margin:0;color:var(--lpws-muted);font-size:.9em}
+.lpws-day{background:var(--lpws-card);border:1px solid var(--lpws-line);border-radius:10px;padding:12px 14px}
+.lpws-day.is-past{opacity:.5}.lpws-day.is-today{border-color:var(--lpws-accent)}
+.lpws-day-head{margin:0 0 8px;display:flex;gap:8px;align-items:baseline}
+.lpws-none{margin:0;font-size:.9em}
 .lpws-events{list-style:none;margin:0;padding:0}
 .lpws-event{border-top:1px solid var(--lpws-line)}.lpws-events li:first-child .lpws-event{border-top:0}
 .lpws-event summary{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:baseline;padding:10px 0;cursor:pointer;list-style:none}
 .lpws-event summary::-webkit-details-marker{display:none}
-.lpws-time{font-variant-numeric:tabular-nums;color:var(--lpws-muted)}
-.lpws-spots{font-size:.85em;color:var(--lpws-muted)}
+.lpws-time{font-variant-numeric:tabular-nums}
+.lpws-spots{font-size:.85em}
 .lpws-more{padding:0 0 12px}.lpws-text{margin:0 0 10px;font-size:.95em}
-.lpws-book{display:inline-block;background:var(--lpws-accent);color:#fff!important;border-radius:999px;padding:8px 22px;text-decoration:none}
+.lpws a.lpws-book{display:inline-block;background:var(--lpws-accent);color:var(--lpws-on-accent)!important;border-radius:999px;padding:8px 22px;text-decoration:none}
 @media(min-width:720px){.lpws-days{grid-template-columns:repeat(7,minmax(0,1fr))}.lpws-event summary{grid-template-columns:1fr}}
 </style>
 <script>

@@ -145,7 +145,8 @@ each other, but syncing the same booking into two places at once is confusing.
 * New: [lp_week_schedule] shortcode, a week view of your services' open slots (this week,
   next week and so on) with time, spots left, details and a Book button that opens the
   LatePoint booking popup preset to that service, date and time. Options: service_ids,
-  weeks (1 to 8, default 4), show_spots (yes/no), button_text.
+  weeks (1 to 8, default 4), show_spots (yes/no), button_text, theme (light/dark).
+  The widget is an opaque panel, so a page background image or overlay never shows through.
 
 = 1.4.3 =
 * New: "People per slot" accepts a comma list (for example 20,10,3) to set a
