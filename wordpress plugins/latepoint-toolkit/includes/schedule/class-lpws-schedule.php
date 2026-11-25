@@ -12,6 +12,12 @@
  *   weeks        how many weeks to offer, 1 to 8 (default 4)
  *   show_spots   yes/no, show "N spots left" (default yes)
  *   button_text  caption of the Book button (default "Book")
+ *   intro        text shown above the schedule, e.g. "These are the classes you can book here.
+ *                The rest of the schedule is listed above." (default empty)
+ *   other_classes  classes that cannot be booked through LatePoint, shown in the same week view
+ *                as greyed entries without a Book button. Separate entries with ";", each is
+ *                "Mon 18:00-19:00 Yoga" (every week) or "2026-12-24 10:00-11:00 Special" (one date).
+ *   other_label  small tag on those entries (default "Not bookable here")
  *   theme        light or dark panel (default light); the panel is always opaque so the
  *                page background image never shows through
  */
@@ -39,6 +45,9 @@ class LPWS_Schedule {
 				'show_spots'  => 'yes',
 				'button_text' => 'Book',
 				'theme'       => 'light',
+				'intro'         => '',
+				'other_classes' => '',
+				'other_label'   => 'Not bookable here',
 			),
 			$atts,
 			'lp_week_schedule'
@@ -59,12 +68,17 @@ class LPWS_Schedule {
 		$monday   = $now->modify( 'monday this week' )->setTime( 0, 0 );
 		$last_day = $monday->modify( '+' . ( $weeks * 7 - 1 ) . ' days' );
 		$by_day   = $this->collect_slots( $services, $monday, $last_day, $today, $now_min );
+		$by_day   = $this->add_other_classes( $by_day, (string) $atts['other_classes'], $monday, $weeks, $today, $now_min );
+		$other_label = (string) $atts['other_label'];
 
 		ob_start();
 		$this->print_assets_once();
 		$uid = 'lpws-' . wp_unique_id();
 		$theme_cls = ( 'dark' === strtolower( (string) $atts['theme'] ) ) ? ' lpws--dark' : '';
 		echo '<div class="lpws' . $theme_cls . '" id="' . esc_attr( $uid ) . '">';
+		if ( '' !== trim( (string) $atts['intro'] ) ) {
+			echo '<p class="lpws-intro">' . wp_kses_post( $atts['intro'] ) . '</p>';
+		}
 
 		for ( $w = 0; $w < $weeks; $w++ ) {
 			$start = $monday->modify( '+' . ( $w * 7 ) . ' days' );
@@ -106,7 +120,11 @@ class LPWS_Schedule {
 				} else {
 					echo '<ul class="lpws-events">';
 					foreach ( $slots as $slot ) {
-						$this->print_slot( $slot, $key, $show_spots, (string) $atts['button_text'] );
+							if ( ! empty( $slot['other'] ) ) {
+							$this->print_other( $slot, $other_label );
+						} else {
+							$this->print_slot( $slot, $key, $show_spots, (string) $atts['button_text'] );
+						}
 					}
 					echo '</ul>';
 				}
@@ -197,6 +215,65 @@ class LPWS_Schedule {
 		return $by_day;
 	}
 
+	/**
+	 * Merge manually listed, non-LatePoint classes into the per-day list.
+	 */
+	private function add_other_classes( array $by_day, $spec, DateTimeImmutable $monday, $weeks, $today, $now_min ) {
+		$spec = trim( html_entity_decode( wp_strip_all_tags( $spec ) ) );
+		if ( '' === $spec ) {
+			return $by_day;
+		}
+		$dow = array( 'mon' => 0, 'tue' => 1, 'wed' => 2, 'thu' => 3, 'fri' => 4, 'sat' => 5, 'sun' => 6 );
+		foreach ( preg_split( '/\s*;\s*/', $spec ) as $entry ) {
+			$entry = trim( $entry );
+			if ( ! preg_match( '/^(\d{4}-\d{2}-\d{2}|[A-Za-z]{3})[A-Za-z]*\s+(\d{1,2})[:.](\d{2})(?:\s*[-\x{2013}]\s*(\d{1,2})[:.](\d{2}))?\s+(.+)$/u', $entry, $m ) ) {
+				continue;
+			}
+			$start = (int) $m[2] * 60 + (int) $m[3];
+			$end   = ( '' !== $m[4] ) ? (int) $m[4] * 60 + (int) $m[5] : 0;
+			$item  = array(
+				'other' => true,
+				'name'  => trim( $m[6] ),
+				'start' => $start,
+				'end'   => $end,
+			);
+			$dates = array();
+			if ( preg_match( '/^\d{4}-/', $m[1] ) ) {
+				$dates[] = $m[1];
+			} elseif ( isset( $dow[ strtolower( $m[1] ) ] ) ) {
+				for ( $w = 0; $w < $weeks; $w++ ) {
+					$dates[] = $monday->modify( '+' . ( $w * 7 + $dow[ strtolower( $m[1] ) ] ) . ' days' )->format( 'Y-m-d' );
+				}
+			}
+			foreach ( $dates as $date ) {
+				if ( $date < $today || ( $date === $today && $start <= $now_min ) ) {
+					continue;
+				}
+				$by_day[ $date ][] = $item;
+			}
+		}
+		foreach ( $by_day as $date => $list ) {
+			usort(
+				$list,
+				function ( $a, $b ) {
+					return $a['start'] <=> $b['start'];
+				}
+			);
+			$by_day[ $date ] = $list;
+		}
+		return $by_day;
+	}
+
+	private function print_other( array $slot, $label ) {
+		$time = $this->fmt( $slot['start'] ) . ( $slot['end'] ? '-' . $this->fmt( $slot['end'] ) : '' );
+		echo '<li><div class="lpws-event lpws-other"><span class="lpws-time">' . esc_html( $time ) . '</span>';
+		echo '<strong class="lpws-name">' . esc_html( $slot['name'] ) . '</strong>';
+		if ( '' !== $label ) {
+			echo '<span class="lpws-spots">' . esc_html( $label ) . '</span>';
+		}
+		echo '</div></li>';
+	}
+
 	private function fmt( $minutes ) {
 		return sprintf( '%02d:%02d', intdiv( (int) $minutes, 60 ) % 24, (int) $minutes % 60 );
 	}
@@ -252,9 +329,11 @@ class LPWS_Schedule {
 .lpws-event summary::-webkit-details-marker{display:none}
 .lpws-time{font-variant-numeric:tabular-nums}
 .lpws-spots{font-size:.85em}
+.lpws-intro{margin:0 0 16px}
+.lpws-other{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:baseline;padding:10px 0;opacity:.65}
 .lpws-more{padding:0 0 12px}.lpws-text{margin:0 0 10px;font-size:.95em}
 .lpws a.lpws-book{display:inline-block;background:var(--lpws-accent);color:var(--lpws-on-accent)!important;border-radius:999px;padding:8px 22px;text-decoration:none}
-@media(min-width:720px){.lpws-days{grid-template-columns:repeat(7,minmax(0,1fr))}.lpws-event summary{grid-template-columns:1fr}}
+@media(min-width:720px){.lpws-days{grid-template-columns:repeat(7,minmax(0,1fr))}.lpws-event summary,.lpws-other{grid-template-columns:1fr}}
 </style>
 <script>
 (function(){

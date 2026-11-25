@@ -3,7 +3,7 @@ Contributors: Liam Bartsch
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.5.0
+Stable tag: 1.5.1
 License: GPLv2 or later
 
 Free LatePoint add-ons as a companion plugin: two-way Apple iCloud Calendar sync
@@ -140,6 +140,13 @@ or run only one. They use separate booking meta keys so they will not corrupt
 each other, but syncing the same booking into two places at once is confusing.
 
 == Changelog ==
+
+= 1.5.1 =
+* New: [lp_week_schedule] can also list classes that cannot be booked through LatePoint:
+  other_classes="Mon 18:00-19:00 Yoga; Wed 09:00-10:00 Pilates" (every week, or a date like
+  2026-12-24 10:00-11:00 Name) shows them greyed in the same week view with no Book button,
+  tagged by other_label (default "Not bookable here"). New intro="..." adds an explanation
+  line above the schedule.
 
 = 1.5.0 =
 * New: [lp_week_schedule] shortcode, a week view of your services' open slots (this week,
