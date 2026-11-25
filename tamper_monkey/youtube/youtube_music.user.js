@@ -1,20 +1,21 @@
 // ==UserScript==
-// @name         YouTube Music Background Playback Fixer
+// @name         YouTube Music: Background Playback and Selectable Lyrics
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.14
-// @description  Keeps YouTube Music playing in background tabs: keeps the tab awake between tracks, resumes after track-change stalls, advances when the queue stops after a song, dismisses idle prompts
+// @version      2026.11.25.1
+// @description  Keeps YouTube Music playing in background tabs (keeps the tab awake, resumes after stalls, advances the queue, dismisses idle prompts) and makes lyrics selectable and copyable
 // @author       You
 // @match        https://music.youtube.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=music.youtube.com
 // @grant        GM_xmlhttpRequest
+// @grant        GM_addStyle
 // @grant        unsafeWindow
 // @connect      localhost
 // @connect      127.0.0.1
 // @run-at       document-start
 // @homepageURL  https://github.com/Global-Alliance-For-Human-Progress/general/tree/main/tamper_monkey/youtube
 // @supportURL   https://github.com/Global-Alliance-For-Human-Progress/general/issues
-// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/youtube/youtube_music_background_keep_playing.user.js
-// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/youtube/youtube_music_background_keep_playing.user.js
+// @downloadURL  https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/youtube/youtube_music.user.js
+// @updateURL    https://raw.githubusercontent.com/Global-Alliance-For-Human-Progress/general/main/tamper_monkey/youtube/youtube_music.user.js
 // ==/UserScript==
 
 (function () {
@@ -218,4 +219,41 @@
     setInterval(() => log('heartbeat', vstate(getVideo()), 'tone=' + (toneCtx ? toneCtx.state : 'none')), 15000);
 
     log('loaded');
+})();
+
+// Selectable lyrics
+(function () {
+    'use strict';
+
+    const css = `
+        ytmusic-description-shelf-renderer,
+        ytmusic-description-shelf-renderer yt-formatted-string,
+        ytmusic-description-shelf-renderer #description,
+        ytmusic-description-shelf-renderer .description {
+            -webkit-user-select: text !important;
+            user-select: text !important;
+            -webkit-touch-callout: default !important;
+            cursor: text !important;
+            pointer-events: auto !important;
+        }
+    `;
+
+    if (typeof GM_addStyle === 'function') {
+        GM_addStyle(css);
+    } else {
+        const style = document.createElement('style');
+        style.textContent = css;
+        (document.head || document.documentElement).appendChild(style);
+    }
+
+    // The player page swallows mouse/select events for its own handlers, so stop them
+    // from reaching those handlers while inside the lyrics
+    const stop = (e) => {
+        if (e.target && e.target.closest && e.target.closest('ytmusic-description-shelf-renderer')) {
+            e.stopPropagation();
+        }
+    };
+    ['mousedown', 'selectstart', 'dragstart', 'contextmenu', 'copy'].forEach((type) => {
+        document.addEventListener(type, stop, true);
+    });
 })();
