@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         YouTube Music: Background Playback and Selectable Lyrics
+// @name         YouTube Music: Background Playback, Selectable Lyrics and Volume Memory
 // @namespace    http://tampermonkey.net/
-// @version      2026.11.25.1
-// @description  Keeps YouTube Music playing in background tabs (keeps the tab awake, resumes after stalls, advances the queue, dismisses idle prompts) and makes lyrics selectable and copyable
+// @version      2026.11.25.2
+// @description  Keeps YouTube Music playing in background tabs (keeps the tab awake, resumes after stalls, advances the queue, dismisses idle prompts), makes lyrics selectable and copyable, and remembers the volume across reloads
 // @author       You
 // @match        https://music.youtube.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=music.youtube.com
