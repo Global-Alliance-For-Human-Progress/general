@@ -20,7 +20,7 @@
  *   other_label  small tag on those entries (default "Not bookable here")
  *   other_links  yes/no (default yes), make the label a link that scrolls to the matching class on
  *                the page. The target is the class name as a slug: "Abs & Glutes (biweekly)" links to
- *                #abs-glutes, so give that section the CSS ID abs-glutes.
+ *                #abs_glutes, so give that section the CSS ID abs_glutes.
  *   theme        light or dark panel (default light); the panel is always opaque so the
  *                page background image never shows through
  */
@@ -275,7 +275,7 @@ class LPWS_Schedule {
 
 	private function slug( $name ) {
 		$name = preg_replace( '/\([^)]*\)/', '', $name );
-		return trim( preg_replace( '/[^a-z0-9]+/', '-', strtolower( $name ) ), '-' );
+		return trim( preg_replace( '/[^a-z0-9]+/', '_', str_replace( '-', '', strtolower( $name ) ) ), '_' );
 	}
 
 	private function print_other( array $slot, $label, $links = true ) {
