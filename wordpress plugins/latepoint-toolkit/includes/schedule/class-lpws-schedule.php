@@ -70,6 +70,7 @@ class LPWS_Schedule {
 		$by_day   = $this->collect_slots( $services, $monday, $last_day, $today, $now_min );
 		$by_day   = $this->add_other_classes( $by_day, (string) $atts['other_classes'], $monday, $weeks, $today, $now_min );
 		$other_label = (string) $atts['other_label'];
+		$has_other   = ( '' !== trim( (string) $atts['other_classes'] ) );
 
 		ob_start();
 		$this->print_assets_once();
@@ -78,6 +79,9 @@ class LPWS_Schedule {
 		echo '<div class="lpws' . $theme_cls . '" id="' . esc_attr( $uid ) . '">';
 		if ( '' !== trim( (string) $atts['intro'] ) ) {
 			echo '<p class="lpws-intro">' . wp_kses_post( $atts['intro'] ) . '</p>';
+		}
+		if ( $has_other ) {
+			echo '<p class="lpws-legend"><span><i></i>Book here</span><span class="is-other"><i></i>' . esc_html( '' !== $other_label ? $other_label : 'Other classes' ) . '</span></p>';
 		}
 
 		for ( $w = 0; $w < $weeks; $w++ ) {
@@ -323,14 +327,20 @@ class LPWS_Schedule {
 .lpws-day.is-past{opacity:.5}.lpws-day.is-today{border-color:var(--lpws-accent)}
 .lpws-day-head{margin:0 0 8px;display:flex;gap:8px;align-items:baseline}
 .lpws-none{margin:0;font-size:.9em}
-.lpws-events{list-style:none;margin:0;padding:0}
-.lpws-event{border-top:1px solid var(--lpws-line)}.lpws-events li:first-child .lpws-event{border-top:0}
+.lpws-events{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.lpws-event{background:var(--lpws-bg);border:1px solid var(--lpws-line);border-left:5px solid var(--lpws-accent);border-radius:8px;padding:0 12px}
 .lpws-event summary{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:baseline;padding:10px 0;cursor:pointer;list-style:none}
+.lpws-event[open]{box-shadow:0 2px 8px rgba(0,0,0,.12)}
 .lpws-event summary::-webkit-details-marker{display:none}
 .lpws-time{font-variant-numeric:tabular-nums}
 .lpws-spots{font-size:.85em}
 .lpws-intro{margin:0 0 16px}
-.lpws-other{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:baseline;padding:10px 0;opacity:.65}
+.lpws-event.lpws-other{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:baseline;padding:10px 12px;background:transparent;border:1px dashed var(--lpws-line);border-left:5px solid var(--lpws-line)}
+.lpws .lpws-other .lpws-name{color:var(--lpws-muted);font-weight:500}
+.lpws-legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:0 0 16px;font-size:.9em}
+.lpws-legend span{display:inline-flex;align-items:center;gap:8px}
+.lpws-legend i{display:inline-block;width:26px;height:14px;border-radius:4px;background:var(--lpws-bg);border:1px solid var(--lpws-line);border-left:5px solid var(--lpws-accent)}
+.lpws-legend .is-other i{background:transparent;border:1px dashed var(--lpws-line);border-left:5px solid var(--lpws-line)}
 .lpws-more{padding:0 0 12px}.lpws-text{margin:0 0 10px;font-size:.95em}
 .lpws a.lpws-book{display:inline-block;background:var(--lpws-accent);color:var(--lpws-on-accent)!important;border-radius:999px;padding:8px 22px;text-decoration:none}
 @media(min-width:720px){.lpws-days{grid-template-columns:repeat(7,minmax(0,1fr))}.lpws-event summary,.lpws-other{grid-template-columns:1fr}}
