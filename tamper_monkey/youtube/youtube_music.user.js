@@ -257,3 +257,46 @@
         document.addEventListener(type, stop, true);
     });
 })();
+
+// Remember volume across reloads (YouTube Music resets it to 50% on load)
+(function () {
+    'use strict';
+
+    const KEY = 'ytm-fix-volume';
+    const read = () => { try { const n = parseFloat(localStorage.getItem(KEY)); return n >= 0 && n <= 100 ? n : null; } catch (e) { return null; } };
+    const write = n => { try { localStorage.setItem(KEY, String(n)); } catch (e) { /* ignore */ } };
+    const bar = () => document.querySelector('ytmusic-player-bar');
+    const sliderValue = () => {
+        const s = document.querySelector('#volume-slider');
+        const n = s && parseFloat(s.getAttribute('aria-valuenow') ?? s.value);
+        return Number.isFinite(n) ? n : null;
+    };
+
+    const saved = read();
+    let restored = saved === null; // nothing to restore: start saving right away
+
+    function apply() {
+        const api = bar() && (bar().playerApi || (unsafeWindow.document.querySelector('ytmusic-player-bar') || {}).playerApi);
+        if (api && typeof api.setVolume === 'function') { api.setVolume(saved); return true; }
+        const v = document.querySelector('video');
+        if (v) { v.volume = saved / 100; return true; }
+        return false;
+    }
+
+    if (!restored) {
+        const t0 = Date.now();
+        const timer = setInterval(() => {
+            const cur = sliderValue();
+            if (cur !== null && Math.abs(cur - saved) < 1) { restored = true; clearInterval(timer); return; }
+            if (document.querySelector('video') && bar()) apply();
+            if (Date.now() - t0 > 15000) { restored = true; clearInterval(timer); }
+        }, 500);
+    }
+
+    // Save only user changes, never the reset that happens while restoring
+    document.addEventListener('volumechange', () => {
+        if (!restored) return;
+        const cur = sliderValue();
+        if (cur !== null) write(cur);
+    }, true);
+})();
