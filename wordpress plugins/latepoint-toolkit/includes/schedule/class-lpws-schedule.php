@@ -281,7 +281,17 @@ class LPWS_Schedule {
 	private function print_other( array $slot, $label, $links = true ) {
 		$time = $this->fmt( $slot['start'] ) . ( $slot['end'] ? '-' . $this->fmt( $slot['end'] ) : '' );
 		echo '<li><div class="lpws-event lpws-other"><span class="lpws-time">' . esc_html( $time ) . '</span>';
-		echo '<strong class="lpws-name">' . esc_html( $slot['name'] ) . '</strong>';
+		$name = $slot['name'];
+		$qual = '';
+		if ( preg_match( '/^(.*?)\s*(\([^)]*\))\s*$/', $name, $q ) && '' !== $q[1] ) {
+			$name = $q[1];
+			$qual = $q[2];
+		}
+		echo '<strong class="lpws-name">' . esc_html( $name );
+		if ( '' !== $qual ) {
+			echo '<small class="lpws-qual">' . esc_html( $qual ) . '</small>';
+		}
+		echo '</strong>';
 		if ( '' !== $label ) {
 			$slug = $links ? $this->slug( $slot['name'] ) : '';
 			if ( '' !== $slug ) {
@@ -349,6 +359,7 @@ class LPWS_Schedule {
 .lpws-event summary::-webkit-details-marker{display:none}
 .lpws-time{font-variant-numeric:tabular-nums}
 .lpws-spots{font-size:.85em}
+.lpws .lpws-qual{display:block;font-size:.8em;font-weight:400;color:var(--lpws-muted)}
 .lpws-intro{margin:0 0 16px}
 .lpws-event.lpws-other{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:baseline;padding:10px 12px;background:transparent;border:1px dashed var(--lpws-line);border-left:5px solid var(--lpws-line)}
 .lpws .lpws-other .lpws-name{color:var(--lpws-muted);font-weight:500}
@@ -360,7 +371,7 @@ html{scroll-behavior:smooth}
 .lpws-legend .is-other i{background:transparent;border:1px dashed var(--lpws-line);border-left:5px solid var(--lpws-line)}
 .lpws-more{padding:0 0 12px}.lpws-text{margin:0 0 10px;font-size:.95em}
 .lpws a.lpws-book{display:inline-block;background:var(--lpws-accent);color:var(--lpws-on-accent)!important;border-radius:999px;padding:8px 22px;text-decoration:none}
-@media(min-width:720px){.lpws-days{grid-template-columns:repeat(7,minmax(0,1fr))}.lpws-event summary,.lpws-event.lpws-other{grid-template-columns:minmax(0,1fr)}.lpws-event{min-width:0;overflow-wrap:anywhere}}
+@media(min-width:720px){.lpws-days{grid-template-columns:repeat(7,minmax(0,1fr))}.lpws-event summary,.lpws-event.lpws-other{grid-template-columns:minmax(0,1fr)}.lpws-event{min-width:0;overflow-wrap:break-word;padding-left:8px;padding-right:8px}.lpws-event.lpws-other{padding:8px}.lpws-event .lpws-name{font-size:.92em;line-height:1.25}}
 </style>
 <script>
 (function(){
