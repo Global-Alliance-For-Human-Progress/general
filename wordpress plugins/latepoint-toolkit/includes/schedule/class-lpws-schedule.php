@@ -343,7 +343,7 @@ class LPWS_Schedule {
 .lpws-legend .is-other i{background:transparent;border:1px dashed var(--lpws-line);border-left:5px solid var(--lpws-line)}
 .lpws-more{padding:0 0 12px}.lpws-text{margin:0 0 10px;font-size:.95em}
 .lpws a.lpws-book{display:inline-block;background:var(--lpws-accent);color:var(--lpws-on-accent)!important;border-radius:999px;padding:8px 22px;text-decoration:none}
-@media(min-width:720px){.lpws-days{grid-template-columns:repeat(7,minmax(0,1fr))}.lpws-event summary,.lpws-other{grid-template-columns:1fr}}
+@media(min-width:720px){.lpws-days{grid-template-columns:repeat(7,minmax(0,1fr))}.lpws-event summary,.lpws-event.lpws-other{grid-template-columns:minmax(0,1fr)}.lpws-event{min-width:0;overflow-wrap:anywhere}}
 </style>
 <script>
 (function(){

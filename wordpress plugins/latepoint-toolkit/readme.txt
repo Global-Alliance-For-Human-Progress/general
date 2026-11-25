@@ -3,7 +3,7 @@ Contributors: Liam Bartsch
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 1.5.2
+Stable tag: 1.5.3
 License: GPLv2 or later
 
 Free LatePoint add-ons as a companion plugin: two-way Apple iCloud Calendar sync
@@ -140,6 +140,9 @@ or run only one. They use separate booking meta keys so they will not corrupt
 each other, but syncing the same booking into two places at once is confusing.
 
 == Changelog ==
+
+= 1.5.3 =
+* Fix: [lp_week_schedule] other-class cards no longer overflow in the 7-day layout; time, name and label now stack.
 
 = 1.5.2 =
 * Change: [lp_week_schedule] classes are now separate cards. Bookable classes have a solid
