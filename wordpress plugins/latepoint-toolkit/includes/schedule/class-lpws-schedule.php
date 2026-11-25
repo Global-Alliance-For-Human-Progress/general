@@ -18,6 +18,9 @@
  *                as greyed entries without a Book button. Separate entries with ";", each is
  *                "Mon 18:00-19:00 Yoga" (every week) or "2026-12-24 10:00-11:00 Special" (one date).
  *   other_label  small tag on those entries (default "Not bookable here")
+ *   other_links  yes/no (default yes), make the label a link that scrolls to the matching class on
+ *                the page. The target is the class name as a slug: "Abs & Glutes (biweekly)" links to
+ *                #abs-glutes, so give that section the CSS ID abs-glutes.
  *   theme        light or dark panel (default light); the panel is always opaque so the
  *                page background image never shows through
  */
@@ -48,6 +51,7 @@ class LPWS_Schedule {
 				'intro'         => '',
 				'other_classes' => '',
 				'other_label'   => 'Not bookable here',
+					'other_links'   => 'yes',
 			),
 			$atts,
 			'lp_week_schedule'
@@ -70,6 +74,7 @@ class LPWS_Schedule {
 		$by_day   = $this->collect_slots( $services, $monday, $last_day, $today, $now_min );
 		$by_day   = $this->add_other_classes( $by_day, (string) $atts['other_classes'], $monday, $weeks, $today, $now_min );
 		$other_label = (string) $atts['other_label'];
+		$other_links = ( 'no' !== strtolower( (string) $atts['other_links'] ) );
 		$has_other   = ( '' !== trim( (string) $atts['other_classes'] ) );
 
 		ob_start();
@@ -125,7 +130,7 @@ class LPWS_Schedule {
 					echo '<ul class="lpws-events">';
 					foreach ( $slots as $slot ) {
 							if ( ! empty( $slot['other'] ) ) {
-							$this->print_other( $slot, $other_label );
+							$this->print_other( $slot, $other_label, $other_links );
 						} else {
 							$this->print_slot( $slot, $key, $show_spots, (string) $atts['button_text'] );
 						}
@@ -268,12 +273,22 @@ class LPWS_Schedule {
 		return $by_day;
 	}
 
-	private function print_other( array $slot, $label ) {
+	private function slug( $name ) {
+		$name = preg_replace( '/\([^)]*\)/', '', $name );
+		return trim( preg_replace( '/[^a-z0-9]+/', '-', strtolower( $name ) ), '-' );
+	}
+
+	private function print_other( array $slot, $label, $links = true ) {
 		$time = $this->fmt( $slot['start'] ) . ( $slot['end'] ? '-' . $this->fmt( $slot['end'] ) : '' );
 		echo '<li><div class="lpws-event lpws-other"><span class="lpws-time">' . esc_html( $time ) . '</span>';
 		echo '<strong class="lpws-name">' . esc_html( $slot['name'] ) . '</strong>';
 		if ( '' !== $label ) {
-			echo '<span class="lpws-spots">' . esc_html( $label ) . '</span>';
+			$slug = $links ? $this->slug( $slot['name'] ) : '';
+			if ( '' !== $slug ) {
+				echo '<a class="lpws-spots lpws-jump" href="#' . esc_attr( $slug ) . '">' . esc_html( $label ) . '</a>';
+			} else {
+				echo '<span class="lpws-spots">' . esc_html( $label ) . '</span>';
+			}
 		}
 		echo '</div></li>';
 	}
@@ -337,6 +352,8 @@ class LPWS_Schedule {
 .lpws-intro{margin:0 0 16px}
 .lpws-event.lpws-other{display:grid;grid-template-columns:auto 1fr auto;gap:4px 14px;align-items:baseline;padding:10px 12px;background:transparent;border:1px dashed var(--lpws-line);border-left:5px solid var(--lpws-line)}
 .lpws .lpws-other .lpws-name{color:var(--lpws-muted);font-weight:500}
+.lpws a.lpws-jump{color:var(--lpws-ink);text-decoration:underline}
+html{scroll-behavior:smooth}
 .lpws-legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:0 0 16px;font-size:.9em}
 .lpws-legend span{display:inline-flex;align-items:center;gap:8px}
 .lpws-legend i{display:inline-block;width:26px;height:14px;border-radius:4px;background:var(--lpws-bg);border:1px solid var(--lpws-line);border-left:5px solid var(--lpws-accent)}
